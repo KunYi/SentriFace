@@ -1,0 +1,5 @@
+<RCC>
+  <qresource prefix="/">
+    <file alias="placeholder_preview.txt">placeholder_preview.txt</file>
+  </qresource>
+</RCC>

@@ -1,0 +1,42 @@
+# Build directories
+/build/
+/cmake-build-*/
+/build_*/
+
+# Compiler outputs
+*.o
+*.obj
+*.a
+*.so
+*.so.*
+*.dylib
+*.dll
+*.exe
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+CTestTestfile.cmake
+cmake_install.cmake
+Makefile
+compile_commands.json
+Testing/
+
+# Editor / OS files
+.DS_Store
+.idea/
+.vscode/
+
+# Downloaded model assets
+third_party/models/
+third_party/onnxruntime/
+third_party/validation_media/
+.venv/
+__pycache__/
+*.pyc
+
+# artifacts
+artifacts/webcam_*
+artifacts/scrfd_*
+artifacts/host_qt_enroll
+artifacts/host_qt_*
