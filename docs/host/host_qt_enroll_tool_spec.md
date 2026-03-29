@@ -99,6 +99,10 @@ The host app should also accept source-mode style startup arguments such as:
 --input=rtsp --rtsp-url=rtsp://...
 ```
 
+若未顯式提供 `--input=...`，目前 host bring-up 預設應採：
+
+- `--input=webcam`
+
 For product flexibility, preview presentation and guidance direction should also
 remain configurable:
 
@@ -139,7 +143,8 @@ be fixed so later integration does not require reshaping the UI entry point.
 The current stage-1 implementation direction is:
 
 - mock source remains available
-- local webcam preview should be integrated first
+- local webcam preview on Linux should use `ffmpeg` as the default backend
+- `Qt Multimedia` may remain as an experimental webcam path
 - RTSP may keep a placeholder backend until later
 
 See also:

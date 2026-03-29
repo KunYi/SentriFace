@@ -17,7 +17,7 @@ enum class PreviewInputMode {
 };
 
 struct PreviewFrameSourceConfig {
-  PreviewInputMode mode = PreviewInputMode::kMock;
+  PreviewInputMode mode = PreviewInputMode::kLocalWebcam;
   int webcam_index = 0;
   QString rtsp_url;
   int width = 1280;

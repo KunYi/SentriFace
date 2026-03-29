@@ -29,6 +29,11 @@ build/host_qt/host/qt_enroll_app/sentriface_enroll_app
 tools/run_host_qt_enroll_webcam.sh
 ```
 
+目前即使直接啟動 `sentriface_enroll_app` 而未帶 `--input=...`，
+host bring-up 預設也應優先採：
+
+- `local_webcam`
+
 If ONNX Runtime and `third_party/models/buffalo_sc/det_500m.onnx` are present,
 the helper scripts now also enable host-side `SCRFD` observation automatically.
 That changes webcam mode from:
@@ -80,6 +85,22 @@ build/host_qt/host/qt_enroll_app/sentriface_enroll_app \
 ```
 
 ## Current Stage-1 Scope
+
+目前本地 webcam 預覽在 Linux host 上應優先是：
+
+- `ffmpeg`
+
+`Qt Multimedia` 保留作實驗性路徑，可在需要時以環境變數強制：
+
+```bash
+SENTRIFACE_HOST_QT_ENROLL_WEBCAM_BACKEND=qt \
+tools/run_host_qt_enroll_webcam.sh
+```
+
+也就是：
+
+- `ffmpeg first`
+- `Qt Multimedia optional`
 
 The current local webcam path is intended to validate:
 
@@ -151,7 +172,8 @@ If the app starts but the webcam frame does not appear:
 
 - try another webcam index
 - verify the host system camera is not occupied by another process
-- confirm the current Qt Multimedia backend supports `QCamera + QVideoProbe`
+- on Linux, check whether the app is already using `ffmpeg`
+- if you explicitly force `Qt Multimedia`, inspect `QCamera` status/error logs
 
 ## Product Direction
 

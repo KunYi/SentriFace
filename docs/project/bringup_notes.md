@@ -37,6 +37,16 @@
 - `Qt offscreen` 可能出現：
   - `This plugin does not support propagateSizeHints()`
   這目前視為已知非致命 warning
+- Linux host 上已確認：
+  - `qt5cam` 這類走 `QCamera + QCameraViewfinder` 的 Qt5 webcam viewer 可正常出畫面
+  - 但目前 host enrollment 使用的 `QVideoProbe` / frame-grab 路徑在本機 `CameraBin/GStreamer`
+    backend 下會出現：
+    - `supportedViewfinderPixelFormats = 0`
+    - `supportedViewfinderResolutions = 0`
+    - `Internal data stream error`
+  - 因此目前 host enrollment webcam 主線暫時收斂為：
+    - Linux 上 `ffmpeg-first`
+    - `Qt Multimedia` 僅保留作實驗性路徑
 - host enrollment accepted frame 與 face crop 已會保存
 - host enrollment UI 近期已收斂：
   - 正常模式移除多餘 debug 文本
