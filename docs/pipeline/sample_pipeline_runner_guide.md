@@ -45,13 +45,37 @@ SENTRIFACE_PIPELINE_USE_V2=1
 
 則 sample runner 會改走：
 
-- `EnrollmentStoreV2`
 - `FaceSearchV2`
-- `FacePipeline` 的 V2 相容路徑
+- `FacePipeline` 的 package-first V2 相容路徑
+- `EnrollmentStoreV2` 只保留作為相容 / adaptive state 容器
 
 並在 stdout 額外輸出：
 
 - `pipeline_mode=v2`
+
+若同時指定：
+
+```bash
+SENTRIFACE_SEARCH_INDEX_PATH=/path/to/search_index.sfsi
+```
+
+則 V2 runner 會優先直接載入 `.sfsi` search-ready index。
+若只持有 `.sfbp`，也可指定：
+
+```bash
+SENTRIFACE_BASELINE_PACKAGE_PATH=/path/to/baseline_package.sfbp
+```
+
+runner 會透過正式 `.sfbp -> .sfsi` helper 載入。
+未指定時，才退回 sample 內建的 package rebuild 路徑。
+
+若要指定 `.sfbp` 載入後在 runtime 內對應的 `person_id`，可再加上：
+
+```bash
+SENTRIFACE_BASELINE_PERSON_ID=7
+```
+
+未指定時預設為 `1`。
 
 ---
 

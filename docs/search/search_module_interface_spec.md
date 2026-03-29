@@ -48,6 +48,7 @@ class FaceSearch {
   explicit FaceSearch(const SearchConfig& config = SearchConfig {});
 
   bool AddPrototype(const FacePrototype& prototype);
+  bool RebuildFromPrototypes(const std::vector<FacePrototype>& prototypes);
   void Clear();
   std::size_t PrototypeCount() const;
   SearchResult Query(const std::vector<float>& embedding) const;
@@ -62,6 +63,53 @@ class FaceSearch {
 - `top1_top2_margin`
 
 這樣能直接支援後續門禁 decision。
+
+### 3.2 512-d implementation note
+
+對固定 `512-d` embedding，較務實的 hot path 可採：
+
+- metadata 與 embedding storage 分離
+- embedding 進 index 時先 normalize
+- 以 contiguous matrix 保存
+- query 時走 batch dot kernel
+
+這不改變 `FaceSearch` 對外 API，但可讓 local exact search 更接近
+`RV1106` 的記憶體與延遲邊界。
+
+若 enrollment / import 階段已經取得穩定的 `512-d` vectors，search 也可直接
+透過 bulk rebuild 邊界載入，而不是由外層逐筆 `AddPrototype(...)`。
+
+對 `Search V2` runtime 來說，正式主線則應再往前一步，優先 direct-load
+`.sfsi` / `FaceSearchV2IndexPackage`；bulk rebuild 比較適合作為 build/import
+階段的 helper。
+
+若 search index 已在 import 階段建好，也建議保留 dedicated binary package，
+直接保存：
+
+- search metadata
+- normalized contiguous matrix
+
+讓 runtime 載入時不必重做 normalize / matrix rebuild。
+若已經有 `.sfsi`，runtime 應優先 direct-load package；CSV 與 store export 只保留給 build / import。
+
+因此建議優先順序為：
+
+- runtime：優先 direct-load `.sfsi`
+- build / import：再使用 bulk rebuild
+
+對應格式規格：
+
+- `docs/search/search_index_package_binary_spec.md`
+
+### 3.3 排序穩定性
+
+當 score 相同時，search 結果建議保留 deterministic tie-break。
+
+這有助於：
+
+- regression 比較
+- replay 可重現性
+- pipeline / decision debug
 
 ---
 

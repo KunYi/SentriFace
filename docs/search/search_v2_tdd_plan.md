@@ -113,17 +113,22 @@
 
 ## 7. Phase 5: 與 Enrollment 的相容測試
 
-這階段不要求先改 `EnrollmentStore V1`，而是先模擬 V2 匯出資料。
+這階段不要求先改 `EnrollmentStore V1`，而是先模擬 V2 prototype 輸入，
+再驗證 search-ready index package 邊界。
 
 ### 7.1 建議測試案例
 
 - baseline / verified / recent 的固定權重輸入
-- `ExportWeightedPrototypes()` 風格資料能被 search 接受
+- `FaceSearchV2IndexPackage` / `LoadFromIndexPackagePath(...)` 能被 search 接受
+- `FaceSearchV2IndexPackage` 能作為 search-ready 邊界被 pipeline / search 接受
 - 權重設計不會讓 recent adaptive 輕易壓過 baseline
 
 ### 7.2 完成條件
 
 - `Search V2` 可以穩定吃 V2 prototype 格式
+- `Search V2` 可以穩定吃 search-ready index package
+- pipeline / integration 測試預設應先走 `FaceSearchV2IndexPackage` / `.sfsi`
+- `EnrollmentStoreV2` 僅保留作 package builder / compatibility coverage
 - weighted score 行為符合 `weighted_search_spec.md`
 
 ---

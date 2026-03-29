@@ -121,6 +121,13 @@ class EnrollmentStoreV2 {
   std::size_t PrototypeCount(int person_id, PrototypeZone zone) const;
   std::vector<PersonRecordV2> GetPersons() const;
   std::vector<sentriface::search::FacePrototypeV2> ExportWeightedPrototypes() const;
+  bool LoadFromSearchIndexPackage(
+      const sentriface::search::FaceSearchV2IndexPackage& package);
+  bool LoadFromSearchIndexPackagePath(const std::string& input_path);
+  sentriface::search::SearchIndexIoDiagnostic BuildSearchIndexPackage(
+      sentriface::search::FaceSearchV2IndexPackage* out_package) const;
+  sentriface::search::SearchIndexIoDiagnostic SaveSearchIndexPackageBinary(
+      const std::string& output_path) const;
   bool ShouldAcceptAdaptivePrototype(const PrototypeMetadata& metadata) const;
   bool ShouldAcceptVerifiedHistoryPrototype(const PrototypeMetadata& metadata) const;
   PrototypeAcceptanceDiagnostic DiagnoseAdaptivePrototype(

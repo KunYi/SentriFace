@@ -1,8 +1,38 @@
 #include "enroll/enrollment_store.hpp"
 
 #include <algorithm>
+#include <cmath>
+#include <unordered_set>
 
 namespace sentriface::enroll {
+
+namespace {
+
+void NormalizeEmbedding(std::vector<float>* embedding) {
+  if (embedding == nullptr || embedding->empty()) {
+    return;
+  }
+  float norm = 0.0f;
+  for (float value : *embedding) {
+    norm += value * value;
+  }
+  norm = std::sqrt(norm);
+  if (norm <= 1e-9f) {
+    std::fill(embedding->begin(), embedding->end(), 0.0f);
+    return;
+  }
+  for (float& value : *embedding) {
+    value /= norm;
+  }
+}
+
+bool IsValidZoneValue(int zone_value) {
+  return zone_value == static_cast<int>(PrototypeZone::kBaseline) ||
+         zone_value == static_cast<int>(PrototypeZone::kVerifiedHistory) ||
+         zone_value == static_cast<int>(PrototypeZone::kRecentAdaptive);
+}
+
+}  // namespace
 
 EnrollmentStore::EnrollmentStore(const EnrollmentConfig& config) : config_(config) {}
 
@@ -212,6 +242,155 @@ std::vector<sentriface::search::FacePrototypeV2> EnrollmentStoreV2::ExportWeight
     }
   }
   return out;
+}
+
+bool EnrollmentStoreV2::LoadFromSearchIndexPackage(
+    const sentriface::search::FaceSearchV2IndexPackage& package) {
+  if (package.embedding_dim != config_.embedding_dim ||
+      package.entries.empty() ||
+      package.normalized_matrix.size() !=
+          package.entries.size() * static_cast<std::size_t>(config_.embedding_dim)) {
+    return false;
+  }
+
+  Clear();
+  int next_prototype_id = 0;
+  std::unordered_set<std::string> prototype_keys;
+  prototype_keys.reserve(package.entries.size());
+  for (std::size_t i = 0; i < package.entries.size(); ++i) {
+    const auto& record = package.entries[i];
+    if (record.person_id < 0 || record.prototype_id < 0 ||
+        record.prototype_weight < 0.0f || record.label.empty() ||
+        !IsValidZoneValue(record.zone)) {
+      Clear();
+      return false;
+    }
+    const std::string prototype_key =
+        std::to_string(record.person_id) + ":" + std::to_string(record.prototype_id);
+    if (!prototype_keys.insert(prototype_key).second) {
+      Clear();
+      return false;
+    }
+
+    auto person_it = persons_.find(record.person_id);
+    if (person_it == persons_.end()) {
+      PersonRecordV2 person;
+      person.person_id = record.person_id;
+      person.label = record.label;
+      person_it = persons_.emplace(record.person_id, std::move(person)).first;
+    } else if (person_it->second.label.empty()) {
+      person_it->second.label = record.label;
+    } else if (person_it->second.label != record.label) {
+      Clear();
+      return false;
+    }
+
+    ZonedPrototype prototype;
+    prototype.prototype_id = record.prototype_id;
+    prototype.zone = static_cast<PrototypeZone>(record.zone);
+    prototype.search_weight = record.prototype_weight;
+    prototype.embedding.assign(
+        package.normalized_matrix.begin() +
+            i * static_cast<std::size_t>(config_.embedding_dim),
+        package.normalized_matrix.begin() +
+            (i + 1U) * static_cast<std::size_t>(config_.embedding_dim));
+    const float zone_weight = ZoneWeight(prototype.zone);
+    if (zone_weight > 0.0f) {
+      prototype.metadata.sample_weight = prototype.search_weight / zone_weight;
+    }
+    prototype.metadata.manually_enrolled =
+        prototype.zone == PrototypeZone::kBaseline;
+    person_it->second.prototypes.push_back(std::move(prototype));
+    if (record.prototype_id >= next_prototype_id) {
+      next_prototype_id = record.prototype_id + 1;
+    }
+  }
+
+  next_prototype_id_ = next_prototype_id;
+  return true;
+}
+
+bool EnrollmentStoreV2::LoadFromSearchIndexPackagePath(
+    const std::string& input_path) {
+  sentriface::search::FaceSearchV2IndexPackage package;
+  const auto diagnostic =
+      sentriface::search::LoadFaceSearchV2IndexPackageBinary(input_path, &package);
+  return diagnostic.ok && LoadFromSearchIndexPackage(package);
+}
+
+sentriface::search::SearchIndexIoDiagnostic
+EnrollmentStoreV2::BuildSearchIndexPackage(
+    sentriface::search::FaceSearchV2IndexPackage* out_package) const {
+  sentriface::search::SearchIndexIoDiagnostic diagnostic;
+  if (out_package == nullptr) {
+    diagnostic.error_message = "null_output_package";
+    return diagnostic;
+  }
+  if (config_.embedding_dim <= 0) {
+    diagnostic.error_message = "invalid_embedding_dim";
+    return diagnostic;
+  }
+
+  sentriface::search::FaceSearchV2IndexPackage package;
+  package.embedding_dim = config_.embedding_dim;
+
+  std::size_t prototype_count = 0U;
+  for (const auto& person_entry : persons_) {
+    prototype_count += person_entry.second.prototypes.size();
+  }
+  if (prototype_count == 0U) {
+    diagnostic.error_message = "missing_prototypes";
+    return diagnostic;
+  }
+
+  package.entries.reserve(prototype_count);
+  package.normalized_matrix.reserve(
+      prototype_count * static_cast<std::size_t>(config_.embedding_dim));
+  for (const auto& person_entry : persons_) {
+    const auto& person = person_entry.second;
+    if (person.person_id < 0 || person.label.empty()) {
+      diagnostic.error_message = "invalid_person_record";
+      return diagnostic;
+    }
+    for (const auto& prototype : person.prototypes) {
+      if (static_cast<int>(prototype.embedding.size()) != config_.embedding_dim ||
+          prototype.prototype_id < 0 || prototype.search_weight < 0.0f) {
+        diagnostic.error_message = "invalid_prototype_record";
+        return diagnostic;
+      }
+
+      sentriface::search::FaceSearchV2IndexRecord record;
+      record.person_id = person.person_id;
+      record.prototype_id = prototype.prototype_id;
+      record.zone = static_cast<int>(prototype.zone);
+      record.label = person.label;
+      record.prototype_weight = prototype.search_weight;
+      package.entries.push_back(std::move(record));
+
+      std::vector<float> normalized = prototype.embedding;
+      NormalizeEmbedding(&normalized);
+      package.normalized_matrix.insert(
+          package.normalized_matrix.end(),
+          normalized.begin(),
+          normalized.end());
+    }
+  }
+
+  *out_package = std::move(package);
+  diagnostic.ok = true;
+  return diagnostic;
+}
+
+sentriface::search::SearchIndexIoDiagnostic
+EnrollmentStoreV2::SaveSearchIndexPackageBinary(
+    const std::string& output_path) const {
+  sentriface::search::FaceSearchV2IndexPackage package;
+  auto diagnostic = BuildSearchIndexPackage(&package);
+  if (!diagnostic.ok) {
+    return diagnostic;
+  }
+  return sentriface::search::SaveFaceSearchV2IndexPackageBinary(
+      package, output_path);
 }
 
 bool EnrollmentStoreV2::ShouldAcceptAdaptivePrototype(

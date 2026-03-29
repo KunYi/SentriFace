@@ -221,7 +221,7 @@ baseline zone 預設不自動更新。
 
 - `AddPrototype(person_id, zone, embedding, metadata)`
 - `PromoteRecentToVerified(person_id, prototype_id)`
-- `ExportWeightedPrototypes()`
+- `BuildFaceSearchV2IndexPackage(...)`
 - `PruneAdaptivePrototypes(person_id)`
 
 metadata 至少可包含：
@@ -241,6 +241,13 @@ metadata 至少可包含：
 
 也就是先把「是否允許吸收」和「真的寫入哪個 zone」拆開，方便後續由
 `decision/pipeline` 在事件成立後再做最終決策。
+
+其中 `ExportWeightedPrototypes()` 若仍保留，較適合作為 build / legacy compatibility helper；
+runtime search 較建議直接使用 `.sfsi` / `FaceSearchV2IndexPackage`。
+若 adaptive update 已實際寫入 `EnrollmentStoreV2`，則持有 search runtime 的
+pipeline / runner 也應同步 refresh 內部 `Search V2` index，而不是只更新 store。
+若 runtime 本來就是由 `.sfsi` 起始，則 adaptive update 所需的 store-side zone state
+也應由同一份 `.sfsi` seed，而不是另走舊的 store-first 初始化。
 
 ---
 

@@ -1,17 +1,17 @@
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <string>
 
 #include "enroll/enrollment_baseline_generation.hpp"
-#include "enroll/enrollment_store.hpp"
 #include "search/face_search.hpp"
 
 namespace {
 
 void PrintUsage() {
   std::cerr
-      << "usage: enrollment_baseline_verify_runner <baseline_embedding_output.csv> "
+      << "usage: enrollment_baseline_verify_runner <baseline_embedding_output.{csv|sfbp}> "
       << "<person_id> [output_summary.txt] [embedding_dim]\n";
 }
 
@@ -35,27 +35,11 @@ std::string DefaultOutputPath(const std::string& csv_path) {
   return dir + "/baseline_verify_summary.txt";
 }
 
-bool BuildSearchIndex(const sentriface::enroll::EnrollmentStoreV2& store,
-                      int embedding_dim,
-                      sentriface::search::FaceSearchV2* out_search) {
-  if (out_search == nullptr) {
-    return false;
-  }
-  sentriface::search::FaceSearchV2 search(
-      sentriface::search::SearchConfig {.embedding_dim = embedding_dim, .top_k = 5});
-  for (const auto& prototype : store.ExportWeightedPrototypes()) {
-    if (!search.AddPrototype(prototype)) {
-      return false;
-    }
-  }
-  *out_search = std::move(search);
-  return true;
-}
-
 bool WriteSummary(const std::string& output_path,
                   int expected_person_id,
                   const sentriface::enroll::BaselinePrototypePackage& package,
-                  const sentriface::search::FaceSearchV2& search) {
+                  const sentriface::search::FaceSearchV2& search,
+                  const std::string& search_index_input) {
   std::ofstream out(output_path);
   if (!out.good()) {
     return false;
@@ -69,6 +53,7 @@ bool WriteSummary(const std::string& output_path,
   out << "user_name=" << package.user_name << "\n";
   out << "person_id=" << expected_person_id << "\n";
   out << "query_prototypes=" << package.prototypes.size() << "\n";
+  out << "search_index_input=" << search_index_input << "\n";
 
   for (const auto& prototype : package.prototypes) {
     const auto result = search.Query(prototype.embedding);
@@ -120,7 +105,7 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  const std::string csv_path(argv[1]);
+  const std::string input_path(argv[1]);
   int person_id = -1;
   if (!ParseIntArg(argv[2], &person_id) || person_id < 0) {
     std::cerr << "invalid person_id\n";
@@ -128,7 +113,7 @@ int main(int argc, char** argv) {
   }
 
   const std::string output_path =
-      argc >= 4 ? std::string(argv[3]) : DefaultOutputPath(csv_path);
+      argc >= 4 ? std::string(argv[3]) : DefaultOutputPath(input_path);
   int embedding_dim = 512;
   if (argc >= 5 &&
       (!ParseIntArg(argv[4], &embedding_dim) || embedding_dim <= 0)) {
@@ -141,41 +126,38 @@ int main(int argc, char** argv) {
   import_config.manually_enrolled = true;
 
   sentriface::enroll::BaselinePrototypePackage package;
-  const auto load_result =
-      sentriface::enroll::LoadBaselinePrototypePackageFromEmbeddingCsv(
-          csv_path, import_config, &package);
+  const auto load_result = sentriface::enroll::LoadBaselinePrototypePackage(
+      input_path, import_config, &package);
   if (!load_result.ok) {
     std::cerr << "load_failed: " << load_result.error_message << "\n";
     return 2;
   }
-
-  sentriface::enroll::EnrollmentStoreV2 store(
-      sentriface::enroll::EnrollmentConfigV2 {.embedding_dim = embedding_dim});
-  if (!store.UpsertPerson(person_id, package.user_name)) {
-    std::cerr << "upsert_person_failed\n";
-    return 3;
+  const int package_embedding_dim =
+      sentriface::enroll::InferBaselinePrototypePackageEmbeddingDim(package);
+  if (package_embedding_dim > 0) {
+    embedding_dim = package_embedding_dim;
   }
 
-  const auto apply_result =
-      sentriface::enroll::ApplyBaselinePrototypePackageToStoreV2(
-          package, person_id, &store);
-  if (!apply_result.ok) {
-    std::cerr << "apply_failed: " << apply_result.error_message << "\n";
-    return 4;
-  }
-
-  sentriface::search::FaceSearchV2 search;
-  if (!BuildSearchIndex(store, embedding_dim, &search)) {
-    std::cerr << "build_search_failed\n";
+  sentriface::search::FaceSearchV2 search(
+      sentriface::search::SearchConfig {.embedding_dim = embedding_dim, .top_k = 5});
+  sentriface::search::FaceSearchV2IndexPackage index_package;
+  std::string search_index_input;
+  const auto index_result =
+      sentriface::enroll::LoadOrBuildFaceSearchV2IndexPackage(
+          input_path, package, person_id, embedding_dim, 1.0f, &index_package,
+          &search_index_input);
+  if (!index_result.ok || !search.LoadFromIndexPackage(index_package)) {
+    std::cerr << "load_search_index_failed\n";
     return 5;
   }
 
-  if (!WriteSummary(output_path, person_id, package, search)) {
+  if (!WriteSummary(output_path, person_id, package, search, search_index_input)) {
     std::cerr << "write_failed\n";
     return 6;
   }
 
   std::cout << "baseline_verify_summary=" << output_path << "\n";
+  std::cout << "search_index_input=" << search_index_input << "\n";
   std::cout << "query_prototypes=" << package.prototypes.size() << "\n";
   return 0;
 }

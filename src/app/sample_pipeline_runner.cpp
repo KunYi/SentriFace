@@ -51,6 +51,52 @@ int ReadEnvInt(const char* name, int default_value) {
   return std::atoi(value);
 }
 
+std::string ReadEnvString(const char* name) {
+  const char* value = std::getenv(name);
+  if (value == nullptr) {
+    return {};
+  }
+  return std::string(value);
+}
+
+bool LoadSinglePrototypeSearchIndex(
+    sentriface::app::FacePipeline& pipeline,
+    const std::string& label,
+    const std::vector<float>& embedding,
+    int embedding_dim) {
+  sentriface::search::FacePrototypeV2 prototype;
+  prototype.person_id = 1;
+  prototype.prototype_id = 10;
+  prototype.zone = 0;
+  prototype.label = label;
+  prototype.embedding = embedding;
+  prototype.prototype_weight = 1.0f;
+  sentriface::search::FaceSearchV2IndexPackage index_package;
+  const auto diagnostic = sentriface::search::BuildFaceSearchV2IndexPackage(
+      std::vector<sentriface::search::FacePrototypeV2> {prototype},
+      embedding_dim, &index_package);
+  return diagnostic.ok && pipeline.LoadEnrollment(index_package);
+}
+
+bool LoadSearchV2Pipeline(
+    sentriface::app::FacePipeline& pipeline,
+    const std::string& search_index_path,
+    const std::string& baseline_package_path,
+    int baseline_person_id,
+    const std::string& label,
+    const std::vector<float>& embedding,
+    int embedding_dim) {
+  if (!search_index_path.empty()) {
+    return pipeline.LoadEnrollment(search_index_path);
+  }
+  if (!baseline_package_path.empty()) {
+    return pipeline.LoadEnrollmentBaselinePackage(
+        baseline_package_path, baseline_person_id);
+  }
+  return LoadSinglePrototypeSearchIndex(
+      pipeline, label, embedding, embedding_dim);
+}
+
 }  // namespace
 
 int main() {
@@ -64,11 +110,7 @@ int main() {
   using sentriface::detector::DetectionConfig;
   using sentriface::detector::SequenceFaceDetector;
   using sentriface::enroll::EnrollmentConfig;
-  using sentriface::enroll::EnrollmentConfigV2;
   using sentriface::enroll::EnrollmentStore;
-  using sentriface::enroll::EnrollmentStoreV2;
-  using sentriface::enroll::PrototypeMetadata;
-  using sentriface::enroll::PrototypeZone;
   using sentriface::access::LoadUnlockControllerConfigFromEnv;
   using sentriface::access::UnlockController;
   using sentriface::access::UnlockControllerConfig;
@@ -89,13 +131,16 @@ int main() {
   }
 
   const bool use_search_v2 = ReadEnvInt("SENTRIFACE_PIPELINE_USE_V2", 0) != 0;
+  const std::string search_index_path =
+      ReadEnvString("SENTRIFACE_SEARCH_INDEX_PATH");
+  const std::string baseline_package_path =
+      ReadEnvString("SENTRIFACE_BASELINE_PACKAGE_PATH");
+  const int baseline_person_id =
+      ReadEnvInt("SENTRIFACE_BASELINE_PERSON_ID", 1);
 
   EnrollmentConfig enroll_config;
   enroll_config.embedding_dim = 4;
   EnrollmentStore store(enroll_config);
-  EnrollmentConfigV2 enroll_config_v2;
-  enroll_config_v2.embedding_dim = 4;
-  EnrollmentStoreV2 store_v2(enroll_config_v2);
 
   DetectionConfig detector_config;
   detector_config.input_width = 640;
@@ -140,28 +185,13 @@ int main() {
 
   FacePipeline pipeline(pipeline_config);
   if (use_search_v2) {
-    PrototypeMetadata metadata;
-    metadata.timestamp_ms = 1000U;
-    metadata.quality_score = 0.95f;
-    metadata.decision_score = 0.90f;
-    metadata.top1_top2_margin = 0.20f;
-    metadata.liveness_ok = true;
-    metadata.manually_enrolled = true;
-    if (!store_v2.UpsertPerson(1, "alice")) {
-      std::cerr << "Failed to create sample person v2\n";
-      return 2;
-    }
-    if (!store_v2.AddPrototype(
-            1,
-            PrototypeZone::kBaseline,
+    if (!LoadSearchV2Pipeline(
+            pipeline, search_index_path, baseline_package_path,
+            baseline_person_id, "alice",
             std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f},
-            metadata)) {
-      std::cerr << "Failed to add sample baseline prototype v2\n";
-      return 3;
-    }
-    if (!pipeline.LoadEnrollment(store_v2)) {
-      std::cerr << "Failed to load enrollment v2 into pipeline\n";
-      return 4;
+            pipeline_config.search.embedding_dim)) {
+      std::cerr << "Failed to load search index package into pipeline\n";
+      return 2;
     }
   } else {
     if (!store.UpsertPerson(1, "alice")) {
@@ -239,8 +269,12 @@ int main() {
   merge_config.short_gap_merge_window_ms = 1500;
   FacePipeline merge_pipeline(merge_config);
   if (use_search_v2) {
-    if (!merge_pipeline.LoadEnrollment(store_v2)) {
-      std::cerr << "Failed to load enrollment v2 into merge pipeline\n";
+    if (!LoadSearchV2Pipeline(
+            merge_pipeline, search_index_path, baseline_package_path,
+            baseline_person_id, "alice",
+            std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f},
+            merge_config.search.embedding_dim)) {
+      std::cerr << "Failed to load search index package into merge pipeline\n";
       return 5;
     }
   } else {

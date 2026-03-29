@@ -17,7 +17,7 @@
 
 重點不是現在就把系統做成大型向量資料庫，而是先避免後面在：
 
-- `EnrollmentStoreV2`
+- `.sfbp` / `.sfsi`
 - `FaceSearchV2`
 - host enrollment artifact
 - `RV1106` 板端部署
@@ -273,7 +273,7 @@ host/server query 可承擔：
 
 ### Phase B
 
-- `EnrollmentStoreV2` 持久化格式
+- `Enrollment package` / `search index package` 持久化格式
 - host-side durable storage
 - weighted search 持續驗證
 

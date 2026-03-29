@@ -1,5 +1,6 @@
 #include <cstdio>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <string>
 #include <vector>
@@ -9,12 +10,16 @@
 int main() {
   using sentriface::app::FacePipeline;
   using sentriface::app::PipelineConfig;
+  using sentriface::enroll::BaselinePrototypePackage;
+  using sentriface::enroll::BaselinePrototypeRecord;
   using sentriface::enroll::EnrollmentConfig;
   using sentriface::enroll::EnrollmentConfigV2;
   using sentriface::enroll::EnrollmentStore;
   using sentriface::enroll::EnrollmentStoreV2;
   using sentriface::enroll::PrototypeMetadata;
   using sentriface::enroll::PrototypeZone;
+  using sentriface::search::FacePrototypeV2;
+  using sentriface::search::FaceSearchV2IndexPackage;
   using sentriface::tracker::TrackSnapshot;
   using sentriface::tracker::TrackState;
 
@@ -315,19 +320,131 @@ int main() {
     return 27;
   }
 
-  FacePipeline pipeline_v2(config);
-  if (!pipeline_v2.LoadEnrollment(store_v2)) {
+  FaceSearchV2IndexPackage index_package;
+  const auto build_index_result = store_v2.BuildSearchIndexPackage(&index_package);
+  if (!build_index_result.ok) {
     return 28;
+  }
+  FacePipeline pipeline_v2(config);
+  if (!pipeline_v2.LoadEnrollment(index_package)) {
+    return 29;
   }
 
   auto search_v2_result = pipeline_v2.SearchEmbeddingV2(
       std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f});
   if (!search_v2_result.ok || search_v2_result.hits.empty()) {
-    return 29;
-  }
-  if (search_v2_result.hits[0].person_id != 1) {
     return 30;
   }
+  if (search_v2_result.hits[0].person_id != 1) {
+    return 31;
+  }
+
+  const std::filesystem::path v2_temp_dir =
+      std::filesystem::temp_directory_path() / "sentriface_face_pipeline_v2_test";
+  std::filesystem::create_directories(v2_temp_dir);
+  const std::filesystem::path v2_index_path = v2_temp_dir / "search_index.sfsi";
+  sentriface::search::FaceSearchV2 v2_search(config.search);
+  if (!v2_search.LoadFromIndexPackage(index_package) ||
+      !v2_search.SaveIndexPackageBinary(v2_index_path.string())) {
+    return 32;
+  }
+  FacePipeline pipeline_v2_from_index(config);
+  if (!pipeline_v2_from_index.LoadEnrollment(v2_index_path.string())) {
+    return 33;
+  }
+  const auto index_result = pipeline_v2_from_index.SearchEmbeddingV2(
+      std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f});
+  if (!index_result.ok || index_result.hits.empty() ||
+      index_result.hits[0].person_id != 1) {
+    return 34;
+  }
+  sentriface::search::FaceSearchV2IndexPackage exported_pipeline_package;
+  if (!pipeline_v2.ExportEnrollmentV2IndexPackage(&exported_pipeline_package) ||
+      exported_pipeline_package.entries.size() != 2U) {
+    return 35;
+  }
+  const std::filesystem::path exported_pipeline_index_path =
+      v2_temp_dir / "exported_search_index.sfsi";
+  if (!pipeline_v2.SaveEnrollmentV2IndexPackageBinary(
+          exported_pipeline_index_path.string())) {
+    return 36;
+  }
+  FacePipeline pipeline_v2_from_pipeline_export(config);
+  if (!pipeline_v2_from_pipeline_export.LoadEnrollment(
+          exported_pipeline_index_path.string())) {
+    return 37;
+  }
+  const auto exported_pipeline_result =
+      pipeline_v2_from_pipeline_export.SearchEmbeddingV2(
+          std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f});
+  if (!exported_pipeline_result.ok || exported_pipeline_result.hits.empty() ||
+      exported_pipeline_result.hits[0].person_id != 1) {
+    return 38;
+  }
+
+  FacePipeline pipeline_v2_from_store(config);
+  if (!pipeline_v2_from_store.LoadEnrollment(store_v2)) {
+    return 39;
+  }
+  const auto store_result = pipeline_v2_from_store.SearchEmbeddingV2(
+      std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f});
+  if (!store_result.ok || store_result.hits.empty() ||
+      store_result.hits[0].person_id != 1) {
+    return 40;
+  }
+  if (pipeline_v2_from_store.SearchEmbedding(
+          std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f}).ok) {
+    return 41;
+  }
+
+  FacePipeline pipeline_mode_switch(config);
+  if (!pipeline_mode_switch.LoadEnrollment(store_v2)) {
+    return 42;
+  }
+  if (!pipeline_mode_switch.LoadEnrollment(store)) {
+    return 43;
+  }
+  if (!pipeline_mode_switch.SearchEmbedding(
+          std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f}).ok) {
+    return 44;
+  }
+  if (pipeline_mode_switch.SearchEmbeddingV2(
+          std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f}).ok) {
+    return 45;
+  }
+
+  BaselinePrototypePackage baseline_package;
+  baseline_package.user_id = "E5001";
+  baseline_package.user_name = "alice";
+  BaselinePrototypeRecord baseline_record;
+  baseline_record.sample_index = 1;
+  baseline_record.slot = "frontal";
+  baseline_record.source_image_path = "sample_01.bmp";
+  baseline_record.source_image_digest = "1234abcd";
+  baseline_record.embedding = {1.0f, 0.0f, 0.0f, 0.0f};
+  baseline_record.metadata = metadata;
+  baseline_package.prototypes.push_back(baseline_record);
+  const std::filesystem::path baseline_package_path =
+      v2_temp_dir / "baseline_package.sfbp";
+  const auto save_pipeline_baseline_result =
+      sentriface::enroll::SaveBaselinePrototypePackageBinary(
+          baseline_package, baseline_package_path.string());
+  if (!save_pipeline_baseline_result.ok) {
+    return 46;
+  }
+  FacePipeline pipeline_v2_from_baseline(config);
+  if (!pipeline_v2_from_baseline.LoadEnrollmentBaselinePackage(
+          baseline_package_path.string(), 1)) {
+    return 47;
+  }
+  const auto baseline_package_result =
+      pipeline_v2_from_baseline.SearchEmbeddingV2(
+          std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f});
+  if (!baseline_package_result.ok || baseline_package_result.hits.empty() ||
+      baseline_package_result.hits[0].person_id != 1) {
+    return 48;
+  }
+  std::filesystem::remove_all(v2_temp_dir);
 
   TrackSnapshot snapshot_v2;
   snapshot_v2.track_id = 60;
@@ -337,18 +454,18 @@ int main() {
 
   auto state_v2 = pipeline_v2.UpdateTrackSearch(60, search_v2_result);
   if (state_v2.unlock_ready) {
-    return 31;
+    return 36;
   }
   state_v2 = pipeline_v2.UpdateTrackSearch(60, search_v2_result);
   if (state_v2.unlock_ready) {
-    return 32;
+    return 37;
   }
   state_v2 = pipeline_v2.UpdateTrackSearch(60, search_v2_result);
   if (!state_v2.unlock_ready) {
-    return 33;
+    return 38;
   }
   if (state_v2.stable_person_id != 1) {
-    return 34;
+    return 39;
   }
 
   EnrollmentConfigV2 adaptive_config;
@@ -368,7 +485,7 @@ int main() {
   EnrollmentStoreV2 adaptive_store(adaptive_config);
   if (!adaptive_store.UpsertPerson(1, "alice") ||
       !adaptive_store.UpsertPerson(2, "bob")) {
-    return 35;
+    return 37;
   }
 
   PrototypeMetadata adaptive_baseline;
@@ -439,11 +556,27 @@ int main() {
   if (adaptive_store.PrototypeCount(1, PrototypeZone::kRecentAdaptive) != 1U) {
     return 43;
   }
+  sentriface::search::FaceSearchV2IndexPackage adaptive_index_package;
+  if (!adaptive_pipeline.ExportEnrollmentV2IndexPackage(&adaptive_index_package) ||
+      adaptive_index_package.entries.size() != 3U) {
+    return 44;
+  }
+  bool found_recent_adaptive = false;
+  for (const auto& entry : adaptive_index_package.entries) {
+    if (entry.person_id == 1 &&
+        entry.zone == static_cast<int>(PrototypeZone::kRecentAdaptive)) {
+      found_recent_adaptive = true;
+      break;
+    }
+  }
+  if (!found_recent_adaptive) {
+    return 45;
+  }
 
   const int duplicate_updates =
       adaptive_pipeline.ApplyAdaptivePrototypeUpdates(adaptive_store, false, true);
   if (duplicate_updates != 0) {
-    return 44;
+    return 46;
   }
 
   adaptive_snapshot.last_timestamp_ms = static_cast<std::uint64_t>(2500);
@@ -451,30 +584,34 @@ int main() {
   adaptive_state = adaptive_pipeline.UpdateTrackSearch(
       70, adaptive_embedding, adaptive_result);
   if (!adaptive_state.unlock_ready) {
-    return 45;
+    return 47;
   }
 
   const int verified_updates =
       adaptive_pipeline.ApplyAdaptivePrototypeUpdates(adaptive_store, true, true);
   if (verified_updates != 1) {
-    return 46;
+    return 48;
   }
   if (adaptive_store.PrototypeCount(1, PrototypeZone::kVerifiedHistory) != 1U) {
-    return 47;
+    return 49;
+  }
+  if (!adaptive_pipeline.ExportEnrollmentV2IndexPackage(&adaptive_index_package) ||
+      adaptive_index_package.entries.size() != 4U) {
+    return 50;
   }
 
   std::ifstream log_in(config.logger_config.file_path);
   if (!log_in.is_open()) {
-    return 48;
+    return 51;
   }
   const std::string log_content((std::istreambuf_iterator<char>(log_in)),
                                 std::istreambuf_iterator<char>());
   if (log_content.find("I/pipeline: short_gap_merge") == std::string::npos) {
-    return 49;
+    return 52;
   }
   if (log_content.find("D/pipeline: prototype_update_candidate") ==
       std::string::npos) {
-    return 50;
+    return 53;
   }
   if (log_content.find("I/pipeline: prototype_update_applied") ==
       std::string::npos) {

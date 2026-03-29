@@ -4,6 +4,7 @@
 #include <string>
 
 #include "enroll/enrollment_artifact_import.hpp"
+#include "enroll/enrollment_baseline_generation.hpp"
 
 namespace {
 
@@ -97,6 +98,56 @@ int main() {
          "plan should preserve frame image path");
   Expect(plan.samples[0].sample_weight > 1.3f,
          "plan should preserve sample weight");
+
+  sentriface::enroll::BaselineGenerationConfig generation_config;
+  generation_config.backend =
+      sentriface::enroll::BaselineGenerationBackend::kMockDeterministic;
+  generation_config.embedding_dim = 8;
+  generation_config.max_samples = 2;
+  sentriface::enroll::EnrollmentArtifactPackage generated_artifact;
+  sentriface::enroll::BaselineEnrollmentPlan generated_plan;
+  sentriface::enroll::BaselinePrototypePackage generated_package;
+  const auto generate_result =
+      sentriface::enroll::GenerateBaselinePrototypePackageFromArtifactSummary(
+          summary_path.string(), generation_config, &generated_artifact,
+          &generated_plan, &generated_package);
+  Expect(generate_result.ok,
+         "artifact summary helper should generate baseline package");
+  Expect(generated_artifact.user_id == package.user_id,
+         "artifact helper should preserve artifact metadata");
+  Expect(generated_plan.samples.size() == plan.samples.size(),
+         "artifact helper should preserve selected sample count");
+  Expect(generated_package.user_id == package.user_id,
+         "artifact helper should propagate package user_id");
+  Expect(generated_package.prototypes.size() == 1U,
+         "artifact helper should emit one baseline prototype");
+  Expect(generated_package.prototypes[0].embedding.size() == 8U,
+         "artifact helper should honor embedding dim");
+
+  const std::filesystem::path artifact_output_path =
+      summary_path.parent_path() / "baseline_artifact_summary.txt";
+  sentriface::enroll::BaselinePrototypePackage saved_package;
+  std::string saved_baseline_package_path;
+  std::string saved_search_index_path;
+  const auto save_result =
+      sentriface::enroll::GenerateAndSaveBaselinePackageArtifactsFromArtifactSummary(
+          summary_path.string(), 7, generation_config, 1.0f,
+          artifact_output_path.string(), nullptr, nullptr, &saved_package,
+          &saved_baseline_package_path, &saved_search_index_path);
+  Expect(save_result.ok,
+         "artifact summary helper should save baseline package artifacts");
+  Expect(saved_baseline_package_path ==
+             (summary_path.parent_path() / "baseline_artifact_summary.sfbp").string(),
+         "artifact save helper should derive .sfbp path from summary output");
+  Expect(saved_search_index_path ==
+             (summary_path.parent_path() / "baseline_artifact_summary.sfsi").string(),
+         "artifact save helper should derive .sfsi path from summary output");
+  Expect(std::filesystem::exists(saved_baseline_package_path),
+         "artifact save helper should write .sfbp");
+  Expect(std::filesystem::exists(saved_search_index_path),
+         "artifact save helper should write .sfsi");
+  Expect(saved_package.prototypes.size() == generated_package.prototypes.size(),
+         "artifact save helper should preserve generated prototype count");
 
   std::filesystem::remove_all(summary_path.parent_path());
   return 0;

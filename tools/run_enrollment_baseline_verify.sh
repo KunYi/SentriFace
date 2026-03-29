@@ -33,13 +33,23 @@ mkdir -p "${OUTPUT_DIR}"
 "${IMPORT_WORKFLOW}" "${SUMMARY_PATH}" "${PERSON_ID}" "${OUTPUT_DIR}" > /dev/null
 
 EMBEDDING_CSV="${OUTPUT_DIR}/baseline_embedding_output.csv"
+BASELINE_PACKAGE="${OUTPUT_DIR}/baseline_embedding_output.sfbp"
+SEARCH_INDEX_PACKAGE="${OUTPUT_DIR}/baseline_embedding_output.sfsi"
 VERIFY_SUMMARY="${OUTPUT_DIR}/baseline_verify_summary.txt"
 
+VERIFY_INPUT="${BASELINE_PACKAGE}"
+if [[ ! -f "${VERIFY_INPUT}" ]]; then
+  VERIFY_INPUT="${EMBEDDING_CSV}"
+fi
+
 "${VERIFY_RUNNER}" \
-  "${EMBEDDING_CSV}" \
+  "${VERIFY_INPUT}" \
   "${PERSON_ID}" \
   "${VERIFY_SUMMARY}" \
   512 > /dev/null
 
+echo "baseline_binary_package=${BASELINE_PACKAGE}"
+echo "search_index_package=${SEARCH_INDEX_PACKAGE}"
+echo "verify_input=${VERIFY_INPUT}"
 echo "embedding_output_csv=${EMBEDDING_CSV}"
 echo "baseline_verify_summary=${VERIFY_SUMMARY}"

@@ -45,6 +45,100 @@ float ReadEnvFloat(const char* name, float default_value) {
   return std::strtof(value, nullptr);
 }
 
+std::string ReadEnvString(const char* name) {
+  const char* value = std::getenv(name);
+  if (value == nullptr) {
+    return {};
+  }
+  return std::string(value);
+}
+
+bool LoadSinglePrototypeSearchIndex(
+    sentriface::app::FacePipeline& pipeline,
+    const std::string& label,
+    const std::vector<float>& embedding,
+    int embedding_dim) {
+  sentriface::search::FacePrototypeV2 prototype;
+  prototype.person_id = 1;
+  prototype.prototype_id = 10;
+  prototype.zone = 0;
+  prototype.label = label;
+  prototype.embedding = embedding;
+  prototype.prototype_weight = 1.0f;
+  sentriface::search::FaceSearchV2IndexPackage index_package;
+  const auto diagnostic = sentriface::search::BuildFaceSearchV2IndexPackage(
+      std::vector<sentriface::search::FacePrototypeV2> {prototype},
+      embedding_dim, &index_package);
+  return diagnostic.ok && pipeline.LoadEnrollment(index_package);
+}
+
+bool SeedAdaptiveStoreWithSinglePrototype(
+    sentriface::enroll::EnrollmentStoreV2* store,
+    const std::string& label,
+    const std::vector<float>& embedding) {
+  if (store == nullptr) {
+    return false;
+  }
+  sentriface::enroll::PrototypeMetadata metadata;
+  metadata.timestamp_ms = 1000U;
+  metadata.quality_score = 0.95f;
+  metadata.decision_score = 0.90f;
+  metadata.top1_top2_margin = 0.20f;
+  metadata.liveness_ok = true;
+  metadata.manually_enrolled = true;
+  return store->UpsertPerson(1, label) &&
+         store->AddPrototype(
+             1,
+             sentriface::enroll::PrototypeZone::kBaseline,
+             embedding,
+             metadata);
+}
+
+bool InitializeSearchV2Runtime(
+    sentriface::app::FacePipeline& pipeline,
+    sentriface::enroll::EnrollmentStoreV2* store,
+    const std::string& search_index_path,
+    const std::string& baseline_package_path,
+    int baseline_person_id,
+    const std::string& label,
+    const std::vector<float>& embedding,
+    int embedding_dim,
+    bool seed_adaptive_store) {
+  if (!search_index_path.empty()) {
+    if (!pipeline.LoadEnrollment(search_index_path)) {
+      return false;
+    }
+    return !seed_adaptive_store ||
+           (store != nullptr &&
+            store->LoadFromSearchIndexPackagePath(search_index_path));
+  }
+
+  if (!baseline_package_path.empty()) {
+    if (!pipeline.LoadEnrollmentBaselinePackage(
+            baseline_package_path, baseline_person_id)) {
+      return false;
+    }
+    if (!seed_adaptive_store) {
+      return true;
+    }
+    if (store == nullptr) {
+      return false;
+    }
+    sentriface::enroll::BaselineEmbeddingCsvImportConfig import_config;
+    import_config.embedding_dim = embedding_dim;
+    import_config.manually_enrolled = true;
+    return sentriface::enroll::LoadBaselinePrototypePackageIntoStoreV2(
+               baseline_package_path, import_config, baseline_person_id, store)
+        .ok;
+  }
+
+  if (!LoadSinglePrototypeSearchIndex(pipeline, label, embedding, embedding_dim)) {
+    return false;
+  }
+  return !seed_adaptive_store ||
+         SeedAdaptiveStoreWithSinglePrototype(store, label, embedding);
+}
+
 }  // namespace
 
 namespace {
@@ -117,6 +211,12 @@ int main(int argc, char** argv) {
       ReadEnvInt("SENTRIFACE_PIPELINE_APPLY_ADAPTIVE_UPDATES", 0) != 0;
   const bool promote_verified_updates =
       ReadEnvInt("SENTRIFACE_PIPELINE_PROMOTE_VERIFIED_UPDATES", 0) != 0;
+  const std::string search_index_path =
+      ReadEnvString("SENTRIFACE_SEARCH_INDEX_PATH");
+  const std::string baseline_package_path =
+      ReadEnvString("SENTRIFACE_BASELINE_PACKAGE_PATH");
+  const int baseline_person_id =
+      ReadEnvInt("SENTRIFACE_BASELINE_PERSON_ID", 1);
 
   sentriface::logging::LoggerConfig logger_defaults;
   logger_defaults.enabled = false;
@@ -229,21 +329,17 @@ int main(int argc, char** argv) {
     prototype[0] = 1.0f;
   }
   if (use_search_v2) {
-    sentriface::enroll::PrototypeMetadata metadata;
-    metadata.timestamp_ms = 1000U;
-    metadata.quality_score = 0.95f;
-    metadata.decision_score = 0.90f;
-    metadata.top1_top2_margin = 0.20f;
-    metadata.liveness_ok = true;
-    metadata.manually_enrolled = true;
-    if (!store_v2.UpsertPerson(1, "mock_person") ||
-        !store_v2.AddPrototype(
-            1,
-            sentriface::enroll::PrototypeZone::kBaseline,
+    if (!InitializeSearchV2Runtime(
+            pipeline,
+            &store_v2,
+            search_index_path,
+            baseline_package_path,
+            baseline_person_id,
+            "mock_person",
             prototype,
-            metadata) ||
-        !pipeline.LoadEnrollment(store_v2)) {
-      std::cerr << "Failed to initialize offline mock decision pipeline v2\n";
+            embedding_dim,
+            apply_adaptive_updates)) {
+      std::cerr << "Failed to initialize offline search v2 runtime\n";
       return 4;
     }
   } else {
@@ -437,9 +533,30 @@ int main(int argc, char** argv) {
       static_cast<int>(pipeline.GetUnlockReadyTracks().size());
   stats.short_gap_merges = pipeline.GetShortGapMergeCount();
 
+  std::string updated_search_index_output;
+  if (use_search_v2 && apply_adaptive_updates) {
+    updated_search_index_output = ReadEnvString("SENTRIFACE_UPDATED_SEARCH_INDEX_PATH");
+    if (updated_search_index_output.empty()) {
+      updated_search_index_output = "offline_search_index_updated.sfsi";
+    }
+    if (!pipeline.SaveEnrollmentV2IndexPackageBinary(updated_search_index_output)) {
+      std::cerr << "Failed to write updated search index package\n";
+      return 8;
+    }
+  }
+
   if (!sentriface::app::WritePipelineReport("offline_sequence_report.txt", stats)) {
     std::cerr << "Failed to write offline sequence report\n";
-    return 8;
+    return 9;
+  }
+  if (!updated_search_index_output.empty()) {
+    std::ofstream report_append("offline_sequence_report.txt", std::ios::app);
+    if (!report_append.is_open()) {
+      std::cerr << "Failed to append updated search index to report\n";
+      return 10;
+    }
+    report_append << "offline_updated_search_index="
+                  << updated_search_index_output << '\n';
   }
 
   std::cout << "offline_frames_processed=" << stats.frames_processed << '\n';
@@ -453,6 +570,10 @@ int main(int argc, char** argv) {
       std::cout << "offline_prototype_updates=offline_prototype_updates.csv\n";
       std::cout << "offline_adaptive_updates_applied="
                 << stats.adaptive_updates_applied << '\n';
+      if (!updated_search_index_output.empty()) {
+        std::cout << "offline_updated_search_index="
+                  << updated_search_index_output << '\n';
+      }
     }
   }
   std::ostringstream summary_log;

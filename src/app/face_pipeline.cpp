@@ -85,25 +85,70 @@ void FacePipeline::SyncTracks(
 }
 
 bool FacePipeline::LoadEnrollment(const sentriface::enroll::EnrollmentStore& store) {
-  search_.Clear();
-  bool ok = true;
-  for (const auto& prototype : store.ExportPrototypes()) {
-    if (!search_.AddPrototype(prototype)) {
-      ok = false;
-    }
-  }
-  return ok;
+  search_v2_.Clear();
+  return search_.RebuildFromPrototypes(store.ExportPrototypes());
 }
 
 bool FacePipeline::LoadEnrollment(const sentriface::enroll::EnrollmentStoreV2& store) {
-  search_v2_.Clear();
-  bool ok = true;
-  for (const auto& prototype : store.ExportWeightedPrototypes()) {
-    if (!search_v2_.AddPrototype(prototype)) {
-      ok = false;
-    }
+  sentriface::search::FaceSearchV2IndexPackage package;
+  const auto diagnostic = store.BuildSearchIndexPackage(&package);
+  if (!diagnostic.ok) {
+    return false;
   }
-  return ok;
+  return LoadEnrollment(package);
+}
+
+bool FacePipeline::LoadEnrollment(
+    const sentriface::search::FaceSearchV2IndexPackage& package) {
+  search_.Clear();
+  return search_v2_.LoadFromIndexPackage(package);
+}
+
+bool FacePipeline::LoadEnrollment(const std::string& search_index_package_path) {
+  search_.Clear();
+  return search_v2_.LoadFromIndexPackagePath(search_index_package_path);
+}
+
+bool FacePipeline::LoadEnrollmentBaselinePackage(const std::string& input_path,
+                                                 int person_id,
+                                                 float baseline_weight) {
+  sentriface::enroll::BaselineEmbeddingCsvImportConfig import_config;
+  import_config.embedding_dim = config_.search.embedding_dim;
+  import_config.manually_enrolled = true;
+
+  sentriface::enroll::BaselinePrototypePackage package;
+  const auto load_result = sentriface::enroll::LoadBaselinePrototypePackage(
+      input_path, import_config, &package);
+  if (!load_result.ok) {
+    return false;
+  }
+
+  const int embedding_dim =
+      sentriface::enroll::InferBaselinePrototypePackageEmbeddingDim(package);
+  if (embedding_dim <= 0 || embedding_dim != config_.search.embedding_dim) {
+    return false;
+  }
+
+  sentriface::search::FaceSearchV2IndexPackage index_package;
+  std::string search_index_input;
+  const auto index_result =
+      sentriface::enroll::LoadOrBuildFaceSearchV2IndexPackage(
+          input_path, package, person_id, embedding_dim, baseline_weight,
+          &index_package, &search_index_input);
+  if (!index_result.ok) {
+    return false;
+  }
+  return LoadEnrollment(index_package);
+}
+
+bool FacePipeline::ExportEnrollmentV2IndexPackage(
+    sentriface::search::FaceSearchV2IndexPackage* out_package) const {
+  return search_v2_.ExportIndexPackage(out_package);
+}
+
+bool FacePipeline::SaveEnrollmentV2IndexPackageBinary(
+    const std::string& output_path) const {
+  return search_v2_.SaveIndexPackageBinary(output_path);
 }
 
 sentriface::search::SearchResult FacePipeline::SearchEmbedding(
@@ -364,6 +409,22 @@ int FacePipeline::ApplyAdaptivePrototypeUpdates(
             << " target_zone="
             << (promote_to_verified ? "verified_history" : "recent_adaptive")
             << " total_updates=" << updates_applied);
+  }
+  if (updates_applied > 0) {
+    sentriface::search::FaceSearchV2IndexPackage package;
+    const auto diagnostic = store.BuildSearchIndexPackage(&package);
+    if (!diagnostic.ok || !search_v2_.LoadFromIndexPackage(package)) {
+      SENTRIFACE_LOGW(
+          logger_,
+          "prototype_update_refresh_failed"
+              << " updates_applied=" << updates_applied);
+    } else {
+      SENTRIFACE_LOGI(
+          logger_,
+          "prototype_update_refresh_applied"
+              << " updates_applied=" << updates_applied
+              << " prototype_count=" << package.entries.size());
+    }
   }
   return updates_applied;
 }

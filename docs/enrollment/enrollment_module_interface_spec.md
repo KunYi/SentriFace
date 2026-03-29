@@ -114,8 +114,17 @@ enrollment tool 導出的：
 
 - `BuildBaselineEnrollmentPlan(...)`
 - `GenerateBaselinePrototypePackage(...)`
+- `GenerateBaselinePrototypePackageFromArtifactSummary(...)`
+- `GenerateAndSaveBaselinePackageArtifactsFromArtifactSummary(...)`
 - `GenerateMockBaselinePrototypePackage(...)`
 - `LoadBaselinePrototypePackageFromEmbeddingCsv(...)`
+- `SaveBaselinePrototypePackageBinary(...)`
+- `SaveBaselinePackageArtifacts(...)`
+- `LoadBaselinePrototypePackageBinary(...)`
+- `LoadBaselinePrototypePackage(...)`
+- `MakeBaselinePrototypePackagePath(...)`
+- `MakeFaceSearchV2IndexPath(...)`
+- `BuildFaceSearchV2IndexPackageFromBaselinePrototypePackage(...)`
 - `enrollment_baseline_import_runner`
 
 也就是先把 artifact 轉成：
@@ -129,12 +138,45 @@ enrollment tool 導出的：
 其中：
 
 - `GenerateBaselinePrototypePackage(...)` 應作為正式 backend dispatch 邊界
+- 目前正式 backend 至少包含：
+  - `mock_deterministic`
+  - `onnxruntime`
+- `GenerateBaselinePrototypePackageFromArtifactSummary(...)` 應作為 host artifact
+  summary 直通 baseline package 的正式 helper，避免 runner / host app 各自重組
+  `artifact -> plan -> package` 流程
+- `GenerateAndSaveBaselinePackageArtifactsFromArtifactSummary(...)` 應作為 host
+  artifact summary 直通 `.sfbp + .sfsi` 的正式 helper，避免 dual-package 落盤
+  仍只存在於 CLI runner 內部
 - `GenerateMockBaselinePrototypePackage(...)` 仍保留作為 bring-up backend
-- `LoadBaselinePrototypePackageFromEmbeddingCsv(...)` 應作為真實 baseline embedding CSV 的正式導入邊界
+- `LoadBaselinePrototypePackageFromEmbeddingCsv(...)` 保留作為真實 baseline embedding CSV 的互通導入邊界
+- `.sfbp` binary package 應作為 host enrollment 產出的正式 direct-load 邊界
+- `.sfsi` binary package 應作為 search-ready normalized index 的正式 direct-load 邊界
+- `LoadBaselinePrototypePackage(...)` 應作為 import / verify runner 的統一載入入口
+- `BuildFaceSearchV2IndexPackageFromBaselinePrototypePackage(...)` 應作為 `.sfbp -> .sfsi` 的正式轉換邊界
+- `SaveBaselinePackageArtifacts(...)` 應作為 `.sfbp + .sfsi` 雙產物落盤的正式 helper
+- `LoadOrBuildFaceSearchV2IndexPackage(...)` 應作為 verify / replay 端的 `.sfsi` 優先載入 helper
+- `MakeBaselinePrototypePackagePath(...)` / `MakeFaceSearchV2IndexPath(...)` 應作為副檔名推導的正式 helper
+- `EnrollmentStoreV2::BuildSearchIndexPackage(...)` 應作為 store-side package export helper
+- `EnrollmentStoreV2::SaveSearchIndexPackageBinary(...)` 應作為 store-side `.sfsi` 落盤 helper
+- `EnrollmentStoreV2::LoadFromSearchIndexPackage(...)` / `LoadFromSearchIndexPackagePath(...)`
+  應作為 replay / adaptive update 端的 store-side `.sfsi` 匯入 helper
+- `LoadBaselinePrototypePackageIntoStoreV2(...)` 應作為 `.sfbp -> EnrollmentStoreV2`
+  的正式 helper，避免 adaptive update / replay runner 自行拼裝
+  `load package -> apply to store`
+- store-side `.sfsi` build 應盡量直接從 zone state 建 package，不必先退回
+  `ExportWeightedPrototypes()` 再重建
+
+正式主線順序應優先視為：
+
+1. host enrollment 產出 `.sfbp`
+2. import / verify 將 `.sfbp` 轉成 `.sfsi`
+3. runtime / replay 優先 direct-load `.sfsi`
+4. CSV 只保留作互通與除錯
 
 對應 guide：
 
 - `docs/enrollment/enrollment_artifact_runner_guide.md`
+- `docs/enrollment/baseline_prototype_package_binary_spec.md`
 - `docs/enrollment/baseline_embedding_import_workflow.md`
 - `docs/enrollment/enrollment_baseline_import_runner_guide.md`
 - `docs/enrollment/enrollment_baseline_verify_runner_guide.md`

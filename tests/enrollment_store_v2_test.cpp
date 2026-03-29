@@ -1,6 +1,9 @@
+#include <cmath>
+#include <filesystem>
 #include <vector>
 
 #include "enroll/enrollment_store.hpp"
+#include "search/face_search.hpp"
 
 int main() {
   using sentriface::enroll::EnrollmentConfigV2;
@@ -148,8 +151,101 @@ int main() {
     return 20;
   }
 
-  if (!store.RemovePerson(1) || store.PersonCount() != 0U) {
+  sentriface::search::FaceSearchV2IndexPackage index_package;
+  const auto build_index_result = store.BuildSearchIndexPackage(&index_package);
+  if (!build_index_result.ok) {
     return 21;
+  }
+  if (index_package.entries.size() != exported.size() ||
+      index_package.normalized_matrix.size() !=
+          exported.size() * static_cast<std::size_t>(config.embedding_dim)) {
+    return 22;
+  }
+  if (index_package.entries[0].person_id != 1 ||
+      index_package.entries[0].zone != static_cast<int>(PrototypeZone::kBaseline) ||
+      index_package.entries[0].prototype_weight != config.baseline_weight) {
+    return 23;
+  }
+  const float first_row_norm =
+      index_package.normalized_matrix[0] * index_package.normalized_matrix[0] +
+      index_package.normalized_matrix[1] * index_package.normalized_matrix[1] +
+      index_package.normalized_matrix[2] * index_package.normalized_matrix[2] +
+      index_package.normalized_matrix[3] * index_package.normalized_matrix[3];
+  if (std::fabs(first_row_norm - 1.0f) > 1e-4f) {
+    return 24;
+  }
+
+  const std::filesystem::path temp_dir =
+      std::filesystem::temp_directory_path() / "sentriface_enrollment_store_v2_test";
+  std::filesystem::create_directories(temp_dir);
+  const std::filesystem::path index_path = temp_dir / "search_index.sfsi";
+  const auto save_index_result = store.SaveSearchIndexPackageBinary(index_path.string());
+  if (!save_index_result.ok) {
+    return 25;
+  }
+  sentriface::search::FaceSearchV2 search(
+      sentriface::search::SearchConfig {.embedding_dim = 4, .top_k = 2});
+  if (!search.LoadFromIndexPackagePath(index_path.string())) {
+    return 26;
+  }
+  const auto search_result = search.Query(std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f});
+  if (!search_result.ok || search_result.hits.empty() ||
+      search_result.hits[0].person_id != 1) {
+    return 27;
+  }
+  EnrollmentStoreV2 loaded_store(config);
+  if (!loaded_store.LoadFromSearchIndexPackagePath(index_path.string())) {
+    return 28;
+  }
+  if (loaded_store.PersonCount() != 1U ||
+      loaded_store.PrototypeCount(1, PrototypeZone::kBaseline) != 1U ||
+      loaded_store.PrototypeCount(1, PrototypeZone::kVerifiedHistory) != 5U ||
+      loaded_store.PrototypeCount(1, PrototypeZone::kRecentAdaptive) != 2U) {
+    return 29;
+  }
+  const auto reexported = loaded_store.ExportWeightedPrototypes();
+  if (reexported.size() != exported.size()) {
+    return 30;
+  }
+  for (std::size_t i = 0; i < reexported.size(); ++i) {
+    if (reexported[i].person_id != exported[i].person_id ||
+        reexported[i].prototype_id != exported[i].prototype_id ||
+        reexported[i].zone != exported[i].zone ||
+        reexported[i].label != exported[i].label ||
+        reexported[i].prototype_weight != exported[i].prototype_weight) {
+      return 31;
+    }
+  }
+  sentriface::search::FaceSearchV2IndexPackage invalid_package = index_package;
+  invalid_package.normalized_matrix.clear();
+  EnrollmentStoreV2 invalid_store(config);
+  if (invalid_store.LoadFromSearchIndexPackage(invalid_package)) {
+    return 32;
+  }
+  invalid_package = index_package;
+  invalid_package.entries[0].zone = 7;
+  if (invalid_store.LoadFromSearchIndexPackage(invalid_package)) {
+    return 33;
+  }
+  invalid_package = index_package;
+  if (invalid_package.entries.size() > 1U) {
+    invalid_package.entries[1].label = "wrong_label";
+    if (invalid_store.LoadFromSearchIndexPackage(invalid_package)) {
+      return 34;
+    }
+  }
+  invalid_package = index_package;
+  if (invalid_package.entries.size() > 1U) {
+    invalid_package.entries[1].prototype_id = invalid_package.entries[0].prototype_id;
+    invalid_package.entries[1].person_id = invalid_package.entries[0].person_id;
+    if (invalid_store.LoadFromSearchIndexPackage(invalid_package)) {
+      return 35;
+    }
+  }
+  std::filesystem::remove_all(temp_dir);
+
+  if (!store.RemovePerson(1) || store.PersonCount() != 0U) {
+    return 36;
   }
 
   return 0;

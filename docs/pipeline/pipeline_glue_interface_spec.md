@@ -42,7 +42,7 @@ src/app/face_pipeline.cpp
 `FacePipeline` 第一版提供：
 
 1. 同步 tracker snapshots
-2. 載入 enrollment prototypes 到 search
+2. 載入 enrollment / search runtime artifacts 到 search
 3. 對 embedding 做 search
 4. 把 search result 更新到 decision
 
@@ -53,14 +53,41 @@ class FacePipeline {
 
   void Reset();
   void SyncTracks(const std::vector<sentriface::tracker::TrackSnapshot>& snapshots);
+  bool LoadEnrollment(const sentriface::search::FaceSearchV2IndexPackage& package);
+  bool LoadEnrollment(const std::string& search_index_package_path);
+  bool LoadEnrollmentBaselinePackage(const std::string& input_path,
+                                     int person_id,
+                                     float baseline_weight = 1.0f);
   bool LoadEnrollment(const sentriface::enroll::EnrollmentStore& store);
+  bool LoadEnrollment(const sentriface::enroll::EnrollmentStoreV2& store);
+  bool ExportEnrollmentV2IndexPackage(
+      sentriface::search::FaceSearchV2IndexPackage* out_package) const;
+  bool SaveEnrollmentV2IndexPackageBinary(const std::string& output_path) const;
 
   sentriface::search::SearchResult SearchEmbedding(
+      const std::vector<float>& embedding) const;
+  sentriface::search::SearchResultV2 SearchEmbeddingV2(
       const std::vector<float>& embedding) const;
   sentriface::decision::DecisionState UpdateTrackSearch(
       int track_id, const sentriface::search::SearchResult& result);
 };
 ```
+
+對 `Search V2` 來說，`FacePipeline` 的主要載入邊界應是 `.sfsi`
+search-ready binary package 或 `FaceSearchV2IndexPackage`。
+若目前只持有 `.sfbp`，也可由 `LoadEnrollmentBaselinePackage(...)` 透過
+正式 `.sfbp -> .sfsi` helper 載入。
+對 sample / offline runner 而言，`.sfbp` 載入時使用的 `person_id`
+也應可由環境變數明確指定，而不是硬編碼在 runner 內部。
+`EnrollmentStoreV2` 只保留作為 build / fallback / adaptive state 相容入口。
+若 runtime 已持有 `.sfsi`，則不應再回退成 `EnrollmentStoreV2 -> export`
+後重建 search。
+
+這樣 runtime / replay runner 可以：
+
+- 直接吃 search-ready index
+- 避免每次重做 store export
+- 避免冷啟動時重新 normalize / rebuild matrix
 
 ---
 

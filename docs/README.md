@@ -28,10 +28,18 @@ Top-level entry:
 - [Embedding Module Interface](embedding/embedding_module_interface_spec.md)
 - [Baseline Embedding Manifest Workflow](embedding/baseline_embedding_manifest_workflow.md)
 - [Search Module Interface](search/search_module_interface_spec.md)
+- [Dot Kernel Strategy](search/dot_kernel_strategy.md)
+- [Dot Kernel Benchmark Guide](search/dot_kernel_benchmark_guide.md)
+- [Search Index Package Binary Spec](search/search_index_package_binary_spec.md)
 - [Enrollment Module Interface](enrollment/enrollment_module_interface_spec.md)
+- [Enrollment Artifact Runner Guide](enrollment/enrollment_artifact_runner_guide.md)
+- [Baseline Prototype Package Binary Spec](enrollment/baseline_prototype_package_binary_spec.md)
+- [SQLite Persistence Evaluation](enrollment/sqlite_persistence_evaluation.md)
 - [Baseline Embedding Import Workflow](enrollment/baseline_embedding_import_workflow.md)
 - [Enrollment Baseline Import Runner Guide](enrollment/enrollment_baseline_import_runner_guide.md)
 - [Enrollment Baseline Verify Runner Guide](enrollment/enrollment_baseline_verify_runner_guide.md)
+
+Package-first artifacts are `.sfbp` and `.sfsi`; CSV stays for interoperability and debug.
 
 ## Pipeline / Validation
 - [Offline Sequence Runner Spec](pipeline/offline_sequence_runner_spec.md)
@@ -43,4 +51,5 @@ Top-level entry:
 
 ## Access / Logging
 - [Access Control Backend Spec](access/access_control_backend_spec.md)
+- [RGB Liveness Anti-Spoof Spec](access/rgb_liveness_anti_spoof_spec.md)
 - [Logging System Spec](logging/logging_system_spec.md)

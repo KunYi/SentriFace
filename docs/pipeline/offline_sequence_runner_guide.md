@@ -160,13 +160,43 @@ frame_001.jpg 1033 640 640 3 rgb888
 
 若指定 `SENTRIFACE_PIPELINE_USE_V2=1`，runner 會改用：
 
-- `EnrollmentStoreV2`
 - `FaceSearchV2`
-- `FacePipeline` 的 V2 相容層
+- `FacePipeline` 的 package-first V2 相容層
+- `EnrollmentStoreV2` 只在需要 adaptive update state 時保留
 
 stdout 也會額外輸出：
 
 - `pipeline_mode=v2`
+
+若同時指定：
+
+- `SENTRIFACE_SEARCH_INDEX_PATH=/path/to/search_index.sfsi`
+
+則 V2 runner 會優先直接載入 `.sfsi`。
+若只持有 baseline package，也可指定：
+
+- `SENTRIFACE_BASELINE_PACKAGE_PATH=/path/to/baseline_package.sfbp`
+
+此時 runner 會經由正式 `.sfbp -> .sfsi` helper 載入 pipeline。
+未指定時，才退回內建的 package rebuild 路徑。
+若要指定 `.sfbp` 載入後使用的 `person_id`，可再加上：
+
+- `SENTRIFACE_BASELINE_PERSON_ID=7`
+
+未指定時預設為 `1`。
+若還要驗證 adaptive update，runner 仍會保留暫時的 `EnrollmentStoreV2`
+作為 prototype policy 狀態容器；若已指定 `.sfsi`，也會用同一份 index
+seed store-side zone state。若指定的是 `.sfbp`，則會透過正式
+`LoadBaselinePrototypePackageIntoStoreV2(...)` helper seed store-side zone
+state。
+若 adaptive update 實際寫入成功，runner 也會輸出：
+
+- `offline_updated_search_index=offline_search_index_updated.sfsi`
+
+作為 refresh 後的 search-ready package。
+若要改路徑，可指定：
+
+- `SENTRIFACE_UPDATED_SEARCH_INDEX_PATH=/path/to/updated_index.sfsi`
 
 ---
 

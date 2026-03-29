@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "decision/face_decision.hpp"
+#include "enroll/enrollment_baseline_generation.hpp"
 #include "enroll/enrollment_store.hpp"
 #include "logging/system_logger.hpp"
 #include "search/face_search.hpp"
@@ -54,6 +55,14 @@ class FacePipeline {
   void SyncTracks(const std::vector<sentriface::tracker::TrackSnapshot>& snapshots);
   bool LoadEnrollment(const sentriface::enroll::EnrollmentStore& store);
   bool LoadEnrollment(const sentriface::enroll::EnrollmentStoreV2& store);
+  bool LoadEnrollment(const sentriface::search::FaceSearchV2IndexPackage& package);
+  bool LoadEnrollment(const std::string& search_index_package_path);
+  bool LoadEnrollmentBaselinePackage(const std::string& input_path,
+                                     int person_id,
+                                     float baseline_weight = 1.0f);
+  bool ExportEnrollmentV2IndexPackage(
+      sentriface::search::FaceSearchV2IndexPackage* out_package) const;
+  bool SaveEnrollmentV2IndexPackageBinary(const std::string& output_path) const;
 
   sentriface::search::SearchResult SearchEmbedding(
       const std::vector<float>& embedding) const;

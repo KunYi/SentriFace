@@ -35,6 +35,7 @@ add_library(sentriface_embedding STATIC
 
 add_library(sentriface_search STATIC
   src/search/face_search.cpp
+  src/search/dot_kernel.cpp
 )
 
 add_library(sentriface_decision STATIC
@@ -62,12 +63,20 @@ add_library(sentriface_app STATIC
 
 add_library(sentriface_camera STATIC
   src/camera/frame_source.cpp
+  src/camera/image_io.cpp
   src/camera/offline_sequence_source.cpp
 )
 
 add_library(sentriface_detector STATIC
   src/detector/face_detector.cpp
   src/detector/scrfd_runtime.cpp
+)
+
+target_link_libraries(sentriface_enroll
+  PUBLIC
+    sentriface_camera
+    sentriface_embedding
+    sentriface_search
 )
 
 if(SENTRIFACE_ENABLE_ONNXRUNTIME)
@@ -102,12 +111,27 @@ if(SENTRIFACE_ENABLE_ONNXRUNTIME)
       "${SENTRIFACE_ONNXRUNTIME_INCLUDE_DIR}"
   )
 
+  target_include_directories(sentriface_embedding
+    PUBLIC
+      "${SENTRIFACE_ONNXRUNTIME_INCLUDE_DIR}"
+  )
+
   target_link_libraries(sentriface_detector
     PUBLIC
       "${SENTRIFACE_ONNXRUNTIME_LIB}"
   )
 
+  target_link_libraries(sentriface_embedding
+    PUBLIC
+      "${SENTRIFACE_ONNXRUNTIME_LIB}"
+  )
+
   target_compile_definitions(sentriface_detector
+    PUBLIC
+      SENTRIFACE_HAS_ONNXRUNTIME=1
+  )
+
+  target_compile_definitions(sentriface_embedding
     PUBLIC
       SENTRIFACE_HAS_ONNXRUNTIME=1
   )
@@ -135,6 +159,10 @@ add_executable(enrollment_baseline_import_runner
 
 add_executable(enrollment_baseline_verify_runner
   src/app/enrollment_baseline_verify_runner.cpp
+)
+
+add_executable(dot_kernel_benchmark_runner
+  src/app/dot_kernel_benchmark_runner.cpp
 )
 
 target_include_directories(sentriface_tracker
@@ -340,11 +368,17 @@ target_link_libraries(enrollment_artifact_runner
 target_link_libraries(enrollment_baseline_import_runner
   PRIVATE
     sentriface_enroll
+    sentriface_search
 )
 
 target_link_libraries(enrollment_baseline_verify_runner
   PRIVATE
     sentriface_enroll
+    sentriface_search
+)
+
+target_link_libraries(dot_kernel_benchmark_runner
+  PRIVATE
     sentriface_search
 )
 

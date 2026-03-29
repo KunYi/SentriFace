@@ -11,14 +11,14 @@ namespace {
 void PrintUsage() {
   std::cerr
       << "usage: enrollment_artifact_runner <enrollment_summary.txt> <person_id> "
-      << "[output_summary.txt] [max_samples] [embedding_dim] [backend]\n";
+      << "[output_summary.txt] [max_samples] [embedding_dim] [backend] [model_path]\n";
 }
 
 std::string DefaultOutputPath(const std::string& summary_path) {
   const std::size_t pos = summary_path.find_last_of("/\\");
   const std::string dir =
       pos == std::string::npos ? "." : summary_path.substr(0, pos);
-  return dir + "/baseline_package_summary.txt";
+  return dir + "/baseline_artifact_summary.txt";
 }
 
 bool ParseIntArg(const char* text, int* out_value) {
@@ -41,7 +41,8 @@ bool WriteSummary(
     const sentriface::enroll::BaselineEnrollmentPlan& plan,
     const sentriface::enroll::BaselineGenerationConfig& config,
     const sentriface::enroll::BaselinePrototypePackage& package,
-    const sentriface::enroll::EnrollmentStoreV2& store) {
+    const std::string& baseline_package_path,
+    const std::string& search_index_path) {
   std::ofstream out(output_path);
   if (!out.good()) {
     return false;
@@ -59,10 +60,10 @@ bool WriteSummary(
   out << "selected_samples=" << plan.samples.size() << "\n";
   out << "baseline_prototypes=" << package.prototypes.size() << "\n";
   out << "baseline_backend=" << sentriface::enroll::ToString(config.backend) << "\n";
-  out << "store_person_count=" << store.PersonCount() << "\n";
-  out << "store_baseline_count="
-      << store.PrototypeCount(person_id, sentriface::enroll::PrototypeZone::kBaseline)
-      << "\n";
+  out << "baseline_binary_package=" << baseline_package_path << "\n";
+  out << "search_index_package=" << search_index_path << "\n";
+  out << "package_person_count=1\n";
+  out << "package_baseline_count=" << package.prototypes.size() << "\n";
 
   for (const auto& sample : plan.samples) {
     out << "\n[sample]\n";
@@ -152,63 +153,43 @@ int main(int argc, char** argv) {
       sentriface::enroll::BaselineGenerationBackend::kMockDeterministic;
   if (argc >= 7) {
     const std::string backend_arg(argv[6]);
-    if (backend_arg != "mock" && backend_arg != "mock_deterministic") {
+    if (backend_arg == "mock" || backend_arg == "mock_deterministic") {
+      backend = sentriface::enroll::BaselineGenerationBackend::kMockDeterministic;
+    } else if (backend_arg == "onnxruntime") {
+      backend = sentriface::enroll::BaselineGenerationBackend::kOnnxRuntime;
+    } else {
       std::cerr << "invalid backend\n";
       return 1;
     }
   }
 
   sentriface::enroll::EnrollmentArtifactPackage artifact;
-  const auto load_result =
-      sentriface::enroll::LoadEnrollmentArtifactPackage(summary_path, &artifact);
-  if (!load_result.ok) {
-    std::cerr << "load_failed: " << load_result.error_message << "\n";
-    return 2;
-  }
-
   sentriface::enroll::BaselineEnrollmentPlan plan;
-  const auto plan_result = sentriface::enroll::BuildBaselineEnrollmentPlan(
-      artifact, max_samples, &plan);
-  if (!plan_result.ok) {
-    std::cerr << "plan_failed: " << plan_result.error_message << "\n";
-    return 3;
-  }
-
   sentriface::enroll::BaselineGenerationConfig generation_config;
   generation_config.backend = backend;
   generation_config.max_samples = max_samples;
   generation_config.embedding_dim = embedding_dim;
+  if (argc >= 8) {
+    generation_config.model_path = argv[7];
+  }
 
   sentriface::enroll::BaselinePrototypePackage package;
+  std::string baseline_package_path;
+  std::string search_index_path;
   const auto generate_result =
-      sentriface::enroll::GenerateBaselinePrototypePackage(
-          plan, generation_config, &package);
+      sentriface::enroll::GenerateAndSaveBaselinePackageArtifactsFromArtifactSummary(
+          summary_path, person_id, generation_config, 1.0f, output_path,
+          &artifact, &plan, &package, &baseline_package_path, &search_index_path);
   if (!generate_result.ok) {
     std::cerr << "generate_failed: " << generate_result.error_message << "\n";
-    return 4;
-  }
-
-  sentriface::enroll::EnrollmentStoreV2 store(
-      sentriface::enroll::EnrollmentConfigV2 {.embedding_dim = embedding_dim});
-  const auto identity_result =
-      sentriface::enroll::ApplyArtifactIdentityToStoreV2(artifact, person_id, &store);
-  if (!identity_result.ok) {
-    std::cerr << "identity_failed: " << identity_result.error_message << "\n";
-    return 5;
-  }
-
-  const auto apply_result =
-      sentriface::enroll::ApplyBaselinePrototypePackageToStoreV2(
-          package, person_id, &store);
-  if (!apply_result.ok) {
-    std::cerr << "apply_failed: " << apply_result.error_message << "\n";
-    return 6;
+    return 2;
   }
 
   if (!WriteSummary(
-          output_path, person_id, artifact, plan, generation_config, package, store)) {
+          output_path, person_id, artifact, plan, generation_config, package,
+          baseline_package_path, search_index_path)) {
     std::cerr << "write_failed: unable_to_write_output_summary\n";
-    return 7;
+    return 4;
   }
 
   sentriface::enroll::BaselineEmbeddingInputManifest manifest;
@@ -216,7 +197,7 @@ int main(int argc, char** argv) {
       sentriface::enroll::BuildBaselineEmbeddingInputManifest(plan, &manifest);
   if (!manifest_result.ok) {
     std::cerr << "manifest_failed: " << manifest_result.error_message << "\n";
-    return 8;
+    return 7;
   }
 
   const std::string manifest_path = output_path;
@@ -225,10 +206,12 @@ int main(int argc, char** argv) {
       "_embedding_input_manifest.txt";
   if (!WriteEmbeddingInputManifest(embedding_input_path, manifest)) {
     std::cerr << "write_failed: unable_to_write_embedding_input_manifest\n";
-    return 9;
+    return 6;
   }
 
-  std::cout << "baseline_package_summary=" << output_path << "\n";
+  std::cout << "baseline_artifact_summary=" << output_path << "\n";
+  std::cout << "baseline_binary_package=" << baseline_package_path << "\n";
+  std::cout << "search_index_package=" << search_index_path << "\n";
   std::cout << "baseline_embedding_input_manifest=" << embedding_input_path << "\n";
   std::cout << "selected_samples=" << plan.samples.size() << "\n";
   std::cout << "baseline_prototypes=" << package.prototypes.size() << "\n";

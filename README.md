@@ -23,8 +23,8 @@ Working end-to-end paths already exist for:
 - webcam-first host enrollment via `Qt 5.15.x`
 - enrollment artifact export with accepted frame + face crop
 - baseline embedding generation using `w600k_mbf.onnx`
-- baseline import into `EnrollmentStoreV2`
-- baseline self-verify using `FaceSearchV2`
+- baseline prototype package (`.sfbp`) and search index package (`.sfsi`) direct-load
+- baseline self-verify using `FaceSearchV2` over `.sfsi`
 - offline replay for detector / tracker / decision validation
 
 Recent bring-up focus:
@@ -107,9 +107,21 @@ tools/run_enrollment_baseline_verify.sh \
 ```
 
 This produces:
-- `baseline_embedding_output.csv`
+- `baseline_embedding_output.sfbp`
+- `baseline_embedding_output.sfsi`
 - `baseline_import_summary.txt`
 - `baseline_verify_summary.txt`
+- `baseline_embedding_output.csv` for interoperability / debug
+
+正式 direct-load handoff 以 `.sfbp / .sfsi` 為主，`CSV` 保留為互通與 bring-up 除錯格式。
+
+若 build 已啟用 C++ `onnxruntime`，也可直接走：
+
+```bash
+tools/run_enrollment_baseline_embedding_cpp.sh \
+  artifacts/host_qt_enroll/<USER>_<TIMESTAMP>/enrollment_summary.txt \
+  <PERSON_ID>
+```
 
 ## Validation Order
 

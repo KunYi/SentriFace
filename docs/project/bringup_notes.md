@@ -48,10 +48,14 @@
 
 ## Mock / Bring-up Boundaries
 
-- `GenerateBaselinePrototypePackage(...)` 已是正式 dispatch 邊界，但目前唯一 backend 仍是 mock
+- `GenerateBaselinePrototypePackage(...)` 已是正式 dispatch 邊界
+- 目前已補上 `onnxruntime` backend，可直接由 artifact preferred image 產生真實 embedding package
 - `GenerateMockBaselinePrototypePackage(...)` 只用於打通 artifact -> baseline package -> store
-- 它不是最終真實 alignment / embedding runtime
+- mock backend 不是最終真實 alignment / embedding runtime
 - `enrollment_artifact_runner` 是 bring-up 工具，不是最終 production import pipeline
+- 但它目前已會產出正式 binary 邊界：
+  - `.sfbp`
+  - `.sfsi`
 
 ---
 

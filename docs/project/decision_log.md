@@ -3,6 +3,42 @@
 本文件記錄目前已確認的高價值設計決策。
 請依功能區塊查閱，不要全文通讀後再開始工作。
 
+## 2026-03-29
+
+- 第一版 liveness / anti-spoof 應優先採 `RGB-only` 輕量策略：
+  - 以 bbox / landmarks / 短時序 motion / 局部亮度與紋理統計為主
+  - 必要時再升級到 `challenge-lite`
+  - 先聚焦防照片 / 防螢幕 replay
+  - 不預設宣稱可處理高品質 3D spoof 或高安全等級 PAD
+- `GenerateBaselinePrototypePackageFromArtifactSummary(...)` 應作為 host
+  enrollment artifact summary 直通 baseline package 的正式 helper，避免
+  `enrollment_artifact_runner` 與後續 host app integration 各自重複拼裝
+  `artifact -> plan -> package` orchestration。
+- `GenerateAndSaveBaselinePackageArtifactsFromArtifactSummary(...)` 應作為
+  host enrollment artifact summary 直通 `.sfbp + .sfsi` 的正式 helper，避免
+  dual-package 落盤仍只存在於 runner 內部。
+- `GenerateBaselinePrototypePackage(...)` 不應再只剩 mock bring-up backend；
+  目前應同時支援 `onnxruntime` backend，讓 artifact preferred image 可直接
+  產生真實 baseline embedding package。
+- `LoadBaselinePrototypePackageIntoStoreV2(...)` 應作為 `.sfbp` seed
+  `EnrollmentStoreV2` 的正式 helper，避免 adaptive replay / runner 仍自行拼裝
+  `load package -> apply to store`。
+- sample / offline runner 在 `.sfbp` 載入路徑上使用的 `person_id` 不應再硬編碼
+  為 `1`；應保留 `SENTRIFACE_BASELINE_PERSON_ID` 讓 runtime package-first
+  bring-up 可明確指定映射目標。
+- `offline_sequence_runner` 在 `SENTRIFACE_SEARCH_INDEX_PATH` +
+  `SENTRIFACE_PIPELINE_APPLY_ADAPTIVE_UPDATES=1` 的組合下，必須讓
+  `FacePipeline` 與 `EnrollmentStoreV2` 同時從同一份 `.sfsi` 起始。
+- `EnrollmentStoreV2` 因此新增
+  `LoadFromSearchIndexPackage(...)` / `LoadFromSearchIndexPackagePath(...)`
+  作為 package-first replay / adaptive update 的正式相容邊界。
+- 目前 `.sfsi -> EnrollmentStoreV2` 以 normalized embedding 作為 store 內部
+  prototype 向量，足以支撐現階段 adaptive update policy，且不必回退舊的
+  store-first rebuild 主線。
+- `EnrollmentStoreV2::BuildSearchIndexPackage(...)` 也應直接由 store 內部 zone
+  state 建 package，而不是先經過 `ExportWeightedPrototypes()` bridge，避免主線
+  package export 仍依賴舊的中介資料流。
+
 ---
 
 ## Project Identity
@@ -85,6 +121,13 @@
 - search V2 方向：
   - prototype-level weighted score
   - person-level max aggregation
+- `512-d` cosine hot path 應優先走固定維度 dot kernel：
+  - prototype import 時先 normalize 成 contiguous matrix
+  - query 時做 batch dot
+  - 512-d fast path 以 metadata + normalized matrix 為主，避免長期保留雙份 embedding
+  - enrollment / import 若已有穩定 `512-d` vectors，search index 應可直接 bulk rebuild
+  - Intel 優先 `AVX2`，其次 `SSE2`
+  - `ARMv7 Cortex-A7` 優先 `NEON`
 - local-first 產品基線：
   - 驗證：`200 persons`
   - 實務目標：`200 ~ 500 persons`
@@ -114,14 +157,31 @@
   - `BuildBaselineEnrollmentPlan(...)`
 - baseline generation 應保留正式 backend dispatch 邊界：
   - `GenerateBaselinePrototypePackage(...)`
+- artifact -> baseline package / search index 的 bring-up runner 應直接產出：
+  - `.sfbp`
+  - `.sfsi`
 - mock baseline generation 目前只作 bring-up：
   - `GenerateMockBaselinePrototypePackage(...)`
+- host enrollment 若已取得穩定 `512-d` embedding：
+  - `.sfbp` 應作為 prototype package 的正式 binary 邊界
+  - `.sfsi` 應作為 search-ready normalized index 的正式 direct-load 邊界
+  - `.sfbp -> .sfsi` 應保留明確轉換邊界，而不是只存在 runner 內部拼裝邏輯
+  - `.sfbp + .sfsi` 雙產物落盤應集中到正式 helper，而不是散落在多個 runner
+  - verify / replay 若已有 sibling `.sfsi`，應優先 direct-load；沒有時才由 `.sfbp` rebuild
+  - adaptive prototype update 若改變 `EnrollmentStoreV2`，pipeline 內的 `Search V2` runtime index 也必須同步 refresh
+  - CSV 只保留作互通與除錯導入，不應再被視為正式 runtime 主線格式
+- SQLite3 目前不作為 runtime 主線必要依賴：
+  - 短中期優先維持 `.sfbp / .sfsi` binary 邊界
+  - 若後續引入 SQLite3，優先定位為 metadata / package catalog，而不是取代 `.sfsi`
 
 相關文件：
 - [docs/enrollment/enrollment_module_interface_spec.md](docs/enrollment/enrollment_module_interface_spec.md)
+- [docs/enrollment/baseline_prototype_package_binary_spec.md](docs/enrollment/baseline_prototype_package_binary_spec.md)
+- [docs/enrollment/sqlite_persistence_evaluation.md](docs/enrollment/sqlite_persistence_evaluation.md)
 - [docs/enrollment/enrollment_store_v2_spec.md](docs/enrollment/enrollment_store_v2_spec.md)
 - [docs/enrollment/adaptive_prototype_policy.md](docs/enrollment/adaptive_prototype_policy.md)
 - [docs/enrollment/enrollment_artifact_runner_guide.md](docs/enrollment/enrollment_artifact_runner_guide.md)
+- [docs/search/search_index_package_binary_spec.md](docs/search/search_index_package_binary_spec.md)
 
 ---
 

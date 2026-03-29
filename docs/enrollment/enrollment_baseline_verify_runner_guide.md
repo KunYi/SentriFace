@@ -14,21 +14,28 @@ tools/run_enrollment_baseline_verify.sh \
 這會依序完成：
 
 1. baseline embedding generate
-2. baseline import
-3. `EnrollmentStoreV2` 建 index
-4. 用同一批 baseline embeddings 做 `FaceSearchV2` self-check
+2. workflow 直接產出 `.sfbp` / `.sfsi`
+3. 若缺少 import summary，補跑 baseline import
+4. verify runner 優先直接載入 `.sfsi`
+5. 若 `.sfsi` 不存在，再直接由 `.sfbp` 重建並回寫 sibling `.sfsi`
+6. 用 `.sfbp` package 的 query prototypes 做 `FaceSearchV2` self-check
 
 ## 主要產物
 
+- `baseline_embedding_output.sfbp`
+- `baseline_embedding_output.sfsi`
 - `baseline_embedding_output.csv`
 - `baseline_import_summary.txt`
 - `baseline_verify_summary.txt`
+
+CSV 只作輸入互通與 debug。
 
 ## Summary 重點
 
 `baseline_verify_summary.txt` 目前會輸出：
 
 - `query_prototypes`
+- `search_index_input`
 - 每個 sample 的 `top1_person_id`
 - `top1_score`
 - `top1_margin`
@@ -39,3 +46,8 @@ tools/run_enrollment_baseline_verify.sh \
 
 - baseline import 是否成功
 - 本地 search index 是否能正確找回 enrollment 本人
+
+格式細節請參考：
+
+- `docs/enrollment/baseline_prototype_package_binary_spec.md`
+- `docs/search/search_index_package_binary_spec.md`

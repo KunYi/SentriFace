@@ -60,6 +60,8 @@
 - `offline_sequence_report.txt`
 - `offline_tracker_timeline.csv`
 - `offline_decision_timeline.csv`
+- `offline_prototype_updates.csv` when adaptive replay is enabled
+- `offline_search_index_updated.sfsi` when V2 adaptive replay is enabled
 
 這兩個檔案可再交給：
 
@@ -82,6 +84,23 @@
 
 - embedding-assisted re-link
 - embedding 是否能補足短時間斷軌的事件連續性
+
+若啟用：
+
+- `SENTRIFACE_PIPELINE_USE_V2=1`
+- `SENTRIFACE_PIPELINE_APPLY_ADAPTIVE_UPDATES=1`
+
+則 runner 也會把 refresh 後的 search-ready index 落成：
+
+- `offline_search_index_updated.sfsi`
+
+並在 stdout / report 輸出：
+
+- `offline_updated_search_index=<path>`
+
+若同時指定 `SENTRIFACE_SEARCH_INDEX_PATH`，runner 應以同一份 `.sfsi`
+同時初始化 `FacePipeline` 與 `EnrollmentStoreV2`，避免 adaptive update 只擁有
+search state 而缺少 store-side zone state。
 
 ---
 

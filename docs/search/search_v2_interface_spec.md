@@ -21,11 +21,15 @@ V2 的重點是把目前 search 從：
 
 Search V2 應滿足：
 
-- 與 `EnrollmentStore V2` 相容
+- 與 `.sfsi` / `FaceSearchV2IndexPackage` 相容
 - 與 `adaptive prototype policy` 相容
 - 保持 `RV1106` 可承受的計算量
 - 保持 decision 仍可使用 `top-1 / top-2 margin`
 - 保留足夠 debug 能力
+
+runtime / replay 主線應優先直接載入 `.sfsi` 或
+`FaceSearchV2IndexPackage`；`AddPrototype(...)` / `RebuildFromPrototypes(...)`
+較適合作為 build、import、compatibility helper。
 
 ---
 
@@ -111,6 +115,12 @@ Search V2 的建議流程如下：
 6. 對 person-level 結果排序並裁成 `top_k`
 7. 產出 `top1_top2_margin`
 
+在實作上，person-level `top_k` 可優先採 partial sort，而不是每次都對
+全部 person hits 做 full sort。
+
+當 score 相同時，也建議保留 deterministic tie-break，避免 replay /
+regression 輸出因等分數而抖動。
+
 ---
 
 ## 6. 第一版 aggregation 建議
@@ -135,12 +145,43 @@ class FaceSearchV2 {
  public:
   explicit FaceSearchV2(const SearchConfig& config = SearchConfig {});
 
+  bool LoadFromIndexPackage(const FaceSearchV2IndexPackage& package);
+  bool LoadFromIndexPackagePath(const std::string& input_path);
+  bool ExportIndexPackage(FaceSearchV2IndexPackage* out_package) const;
+  bool SaveIndexPackageBinary(const std::string& output_path) const;
   bool AddPrototype(const FacePrototypeV2& prototype);
+  bool RebuildFromPrototypes(const std::vector<FacePrototypeV2>& prototypes);
   void Clear();
   std::size_t PrototypeCount() const;
   SearchResultV2 Query(const std::vector<float>& embedding) const;
 };
 ```
+
+主線優先順序應是：
+
+1. runtime / replay 優先直接 `LoadFromIndexPackagePath(...)`
+2. import / build 階段使用 `RebuildFromPrototypes(...)`
+3. `AddPrototype(...)` 保留給測試、工具或增量 builder
+
+對固定 `512-d` hot path，建議再補一個 search-ready binary package 邊界：
+
+- 存 person / prototype metadata
+- 存已 normalize 的 contiguous matrix
+- runtime 直接載入，不必再經過 store export 或重新 normalize
+
+這種 package 比較適合作為板端 direct-load 產物，而不是把 CSV 視為正式 runtime 格式。
+`AddPrototype(...)` / `RebuildFromPrototypes(...)` 比較像 build / import helper；runtime 主線應優先走 `LoadFromIndexPackagePath(...)`。
+若是 build/test tooling 要一次完成 package 落盤，則可使用
+`BuildAndSaveFaceSearchV2IndexPackageBinary(...)`。
+
+在 V2 路徑上，建議優先順序為：
+
+- runtime / replay 載入：`LoadFromIndexPackagePath(...)`
+- build / import 階段：`RebuildFromPrototypes(...)`
+
+格式細節請參考：
+
+- `docs/search/search_index_package_binary_spec.md`
 
 ---
 

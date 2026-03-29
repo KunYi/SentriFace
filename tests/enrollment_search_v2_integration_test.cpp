@@ -1,4 +1,5 @@
 #include <cmath>
+#include <filesystem>
 #include <vector>
 
 #include "enroll/enrollment_store.hpp"
@@ -18,86 +19,85 @@ int main() {
   using sentriface::enroll::PrototypeMetadata;
   using sentriface::enroll::PrototypeZone;
   using sentriface::search::FaceSearchV2;
+  using sentriface::search::FaceSearchV2IndexPackage;
   using sentriface::search::SearchConfig;
-
-  EnrollmentConfigV2 enroll_config;
-  enroll_config.embedding_dim = 4;
-  enroll_config.max_baseline_prototypes = 1;
-  enroll_config.max_verified_history_prototypes = 5;
-  enroll_config.max_recent_adaptive_prototypes = 2;
-  enroll_config.baseline_weight = 1.0f;
-  enroll_config.verified_history_weight = 0.8f;
-  enroll_config.recent_adaptive_weight = 0.6f;
-
-  EnrollmentStoreV2 store(enroll_config);
-  if (!store.UpsertPerson(1, "alice") || !store.UpsertPerson(2, "bob")) {
-    return 1;
-  }
-
-  PrototypeMetadata metadata;
-  metadata.liveness_ok = true;
-  metadata.quality_score = 0.9f;
-  metadata.decision_score = 0.85f;
-  metadata.top1_top2_margin = 0.08f;
-
-  if (!store.AddPrototype(
-          1, PrototypeZone::kBaseline,
-          std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f}, metadata)) {
-    return 2;
-  }
-  if (!store.AddPrototype(
-          1, PrototypeZone::kRecentAdaptive,
-          std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f}, metadata)) {
-    return 3;
-  }
-  if (!store.AddPrototype(
-          2, PrototypeZone::kVerifiedHistory,
-          std::vector<float> {0.9f, 0.1f, 0.0f, 0.0f}, metadata)) {
-    return 4;
-  }
-
-  const auto exported = store.ExportWeightedPrototypes();
-  if (exported.size() != 3U) {
-    return 5;
-  }
 
   SearchConfig search_config;
   search_config.embedding_dim = 4;
   search_config.top_k = 2;
 
-  FaceSearchV2 search(search_config);
-  for (const auto& prototype : exported) {
-    if (!search.AddPrototype(prototype)) {
-      return 6;
-    }
+  EnrollmentConfigV2 enroll_config;
+  enroll_config.embedding_dim = 4;
+  EnrollmentStoreV2 store(enroll_config);
+  PrototypeMetadata metadata;
+  metadata.timestamp_ms = 1000U;
+  metadata.quality_score = 0.95f;
+  metadata.decision_score = 0.90f;
+  metadata.top1_top2_margin = 0.20f;
+  metadata.liveness_ok = true;
+  metadata.manually_enrolled = true;
+  if (!store.UpsertPerson(1, "alice") ||
+      !store.UpsertPerson(2, "bob") ||
+      !store.AddPrototype(
+          1, PrototypeZone::kBaseline,
+          std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f}, metadata) ||
+      !store.AddPrototype(
+          1, PrototypeZone::kRecentAdaptive,
+          std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f}, metadata) ||
+      !store.AddPrototype(
+          2, PrototypeZone::kVerifiedHistory,
+          std::vector<float> {0.9f, 0.1f, 0.0f, 0.0f}, metadata)) {
+    return 1;
   }
 
+  FaceSearchV2IndexPackage index_package;
+  const auto build_result = store.BuildSearchIndexPackage(&index_package);
+  if (!build_result.ok) {
+    return 2;
+  }
+
+  const std::filesystem::path temp_dir =
+      std::filesystem::temp_directory_path() /
+      "sentriface_enrollment_search_v2_integration_test";
+  std::filesystem::create_directories(temp_dir);
+  const std::filesystem::path index_path = temp_dir / "search_index.sfsi";
+
+  FaceSearchV2 package_search(search_config);
+  if (!package_search.LoadFromIndexPackage(index_package) ||
+      !package_search.SaveIndexPackageBinary(index_path.string())) {
+    return 3;
+  }
+
+  FaceSearchV2 search(search_config);
+  if (!search.LoadFromIndexPackagePath(index_path.string())) {
+    return 4;
+  }
   const auto result = search.Query(std::vector<float> {1.0f, 0.0f, 0.0f, 0.0f});
   if (!result.ok) {
-    return 7;
+    return 5;
   }
   if (result.hits.size() != 2U) {
-    return 8;
+    return 6;
   }
   if (result.prototype_hits.size() != 3U) {
-    return 9;
+    return 7;
   }
 
   if (result.hits[0].person_id != 1) {
-    return 10;
+    return 8;
   }
   if (result.hits[0].best_zone != static_cast<int>(PrototypeZone::kBaseline)) {
-    return 11;
+    return 9;
   }
-  if (result.hits[0].score != enroll_config.baseline_weight) {
-    return 12;
+  if (result.hits[0].score != 1.0f) {
+    return 10;
   }
 
   if (result.prototype_hits[0].zone != static_cast<int>(PrototypeZone::kBaseline)) {
-    return 13;
+    return 11;
   }
-  if (!AlmostEqual(result.prototype_hits[0].weighted_score, enroll_config.baseline_weight)) {
-    return 14;
+  if (!AlmostEqual(result.prototype_hits[0].weighted_score, 1.0f)) {
+    return 12;
   }
 
   bool found_recent = false;
@@ -105,25 +105,26 @@ int main() {
   for (const auto& hit : result.prototype_hits) {
     if (hit.zone == static_cast<int>(PrototypeZone::kRecentAdaptive)) {
       found_recent = true;
-      if (!AlmostEqual(hit.weighted_score, enroll_config.recent_adaptive_weight)) {
-        return 15;
+      if (!AlmostEqual(hit.weighted_score, 0.6f)) {
+        return 13;
       }
     }
     if (hit.zone == static_cast<int>(PrototypeZone::kVerifiedHistory)) {
       found_verified = true;
-      if (!(hit.weighted_score > enroll_config.recent_adaptive_weight)) {
-        return 16;
+      if (!(hit.weighted_score > 0.6f)) {
+        return 14;
       }
     }
   }
 
   if (!found_recent || !found_verified) {
-    return 17;
+    return 15;
   }
 
   if (!(result.top1_top2_margin > 0.0f)) {
-    return 18;
+    return 16;
   }
 
+  std::filesystem::remove_all(temp_dir);
   return 0;
 }

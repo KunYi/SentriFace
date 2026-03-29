@@ -245,6 +245,25 @@ add_test(
   COMMAND face_embedder_test
 )
 
+add_executable(image_io_test
+  image_io_test.cpp
+)
+
+target_link_libraries(image_io_test
+  PRIVATE
+    sentriface_camera
+)
+
+target_include_directories(image_io_test
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
+add_test(
+  NAME image_io_test
+  COMMAND image_io_test
+)
+
 add_executable(face_search_test
   face_search_test.cpp
 )
@@ -262,6 +281,25 @@ target_include_directories(face_search_test
 add_test(
   NAME face_search_test
   COMMAND face_search_test
+)
+
+add_executable(dot_kernel_test
+  dot_kernel_test.cpp
+)
+
+target_link_libraries(dot_kernel_test
+  PRIVATE
+    sentriface_search
+)
+
+target_include_directories(dot_kernel_test
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
+add_test(
+  NAME dot_kernel_test
+  COMMAND dot_kernel_test
 )
 
 add_executable(face_search_v2_test
@@ -404,6 +442,7 @@ add_executable(enrollment_baseline_generation_test
 target_link_libraries(enrollment_baseline_generation_test
   PRIVATE
     sentriface_enroll
+    sentriface_search
 )
 
 target_include_directories(enrollment_baseline_generation_test
@@ -674,6 +713,17 @@ add_executable(sample_pipeline_runner_v2_test
 
 add_dependencies(sample_pipeline_runner_v2_test sample_pipeline_runner)
 
+target_link_libraries(sample_pipeline_runner_v2_test
+  PRIVATE
+    sentriface_search
+    sentriface_enroll
+)
+
+target_include_directories(sample_pipeline_runner_v2_test
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
+
 target_compile_definitions(sample_pipeline_runner_v2_test
   PRIVATE
     SENTRIFACE_BINARY_DIR="${CMAKE_BINARY_DIR}"
@@ -732,6 +782,17 @@ add_executable(offline_sequence_runner_v2_test
 )
 
 add_dependencies(offline_sequence_runner_v2_test offline_sequence_runner)
+
+target_link_libraries(offline_sequence_runner_v2_test
+  PRIVATE
+    sentriface_search
+    sentriface_enroll
+)
+
+target_include_directories(offline_sequence_runner_v2_test
+  PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+)
 
 target_compile_definitions(offline_sequence_runner_v2_test
   PRIVATE
