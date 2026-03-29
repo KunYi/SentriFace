@@ -14,6 +14,7 @@ Top-level entry:
 - [Hardware Baseline](platform/rv1106_system_hardware_baseline.md)
 - [Numeric Type Policy](platform/rv1106_numeric_type_policy.md)
 - [Geometry Numeric Boundary](platform/geometry_numeric_boundary.md)
+- [RKNN Embedding Validation Checklist](platform/rknn_embedding_validation_checklist.md)
 
 ## Detector
 - [Detector Module Interface](detector/detector_module_interface_spec.md)
@@ -26,6 +27,10 @@ Top-level entry:
 
 ## Embedding / Search / Enrollment
 - [Embedding Module Interface](embedding/embedding_module_interface_spec.md)
+- [Embedding Model Evaluation](embedding/embedding_model_evaluation.md)
+- [Embedding Model Validation Plan](embedding/embedding_model_validation_plan.md)
+- [Embedding Candidate Asset Checklist](embedding/embedding_candidate_asset_checklist.md)
+- [Embedding Benchmark Report Template](embedding/embedding_benchmark_report_template.md)
 - [Baseline Embedding Manifest Workflow](embedding/baseline_embedding_manifest_workflow.md)
 - [Search Module Interface](search/search_module_interface_spec.md)
 - [Dot Kernel Strategy](search/dot_kernel_strategy.md)
