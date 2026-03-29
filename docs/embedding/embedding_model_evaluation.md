@@ -44,6 +44,25 @@
 InsightFace 的 model zoo 也把 `buffalo_s` / `buffalo_sc` 的 recognition backbone 標為
 `MBF@WebFace600K`。
 
+### 2.3 Luckfox 已有 `RetinaFace + MobileFaceNet` RKNN 示例的意義
+
+Luckfox 官方 `luckfox_pico_rknn_example` 已提供：
+
+- `luckfox_retinaface_facenet`
+- `RetinaFace.rknn`
+- `mobilefacenet.rknn`
+
+這件事的價值不在於它自動證明該組合「精度最好」，
+而在於它明確提高了這條模型家族作為：
+
+- `RKNN-safe candidate`
+- `deployment-safe fallback`
+
+的優先級。
+
+也就是說，若我們自己的主線候選在 `ONNX -> RKNN` 上遇到 operator compatibility
+問題，`Luckfox` 已示範過的這條組合應優先被考慮，而不是只從一般論文候選重新猜一次。
+
 ---
 
 ## 3. 本專案的選型前提
@@ -116,6 +135,9 @@ InsightFace 的 model zoo 也把 `buffalo_s` / `buffalo_sc` 的 recognition back
 
 - 最穩妥的主線 baseline
 - 也是最合理的第一個 `RKNN` compatibility 驗證對象
+- 若 `w600k_mbf` graph 本身在 `RKNN` 轉換上不順，應優先查看：
+  - Luckfox 已提供的 `mobilefacenet.rknn`
+  - 以及其對應模型/前後處理路線
 
 ### 5.2 `PocketNet`
 
@@ -259,6 +281,18 @@ InsightFace 的 model zoo 也把 `buffalo_s` / `buffalo_sc` 的 recognition back
 2. `PocketNet`
 3. `MixFaceNet`
 
+### Tier A-Deploy：若現有模型轉換有問題，優先嘗試
+
+1. `Luckfox RetinaFace + MobileFaceNet`
+
+原因：
+
+- 這不是純 paper 候選，而是已存在的 Luckfox / RKNN 示例路線
+- 對 `RV1106 + RKNN` 來說，這種已有 board-family 部署脈絡的模型組合，
+  優先級應高於單純學術上更漂亮、但 conversion 風險未知的候選
+- 若 `SCRFD-500M` 或 `w600k_mbf` 在 `RKNN` 轉換上遇到阻塞，應優先拿這條做
+  `deployment-safe fallback` 驗證
+
 原因：
 
 - 都屬於 compact FR 的合理方向
@@ -305,6 +339,12 @@ InsightFace 的 model zoo 也把 `buffalo_s` / `buffalo_sc` 的 recognition back
 4. `EdgeFace`
 5. `GhostFaceNets`
 
+若是因為 `RKNN compatibility` 而不是純精度/延遲問題卡住，則應把：
+
+6. `Luckfox RetinaFace + MobileFaceNet`
+
+提前為優先 fallback 路線。
+
 ### 8.3 第一批驗證順序
 
 建議順序：
@@ -314,6 +354,11 @@ InsightFace 的 model zoo 也把 `buffalo_s` / `buffalo_sc` 的 recognition back
 3. `MixFaceNet ONNX -> RKNN`
 4. host / board reference comparison
 5. 再依結果凍結板端主線
+
+若在步驟 `1` 就遇到明顯 operator / conversion 阻塞，則不要直接跳到更複雜的新候選，
+而應先插入：
+
+- `Luckfox RetinaFace + MobileFaceNet` 路線檢查
 
 ---
 
@@ -362,6 +407,8 @@ InsightFace 的 model zoo 也把 `buffalo_s` / `buffalo_sc` 的 recognition back
 
 - InsightFace model zoo / package table:
   - https://deepwiki.com/deepinsight/insightface/5.2-face-detection-%28scrfd%29
+- Luckfox Pico RKNN example:
+  - https://github.com/LuckfoxTECH/luckfox_pico_rknn_example/tree/kernel-5.10.160
 - MobileFaceNets paper:
   - https://arxiv.org/abs/1804.07573
 - PocketNet paper:
@@ -370,6 +417,7 @@ InsightFace 的 model zoo 也把 `buffalo_s` / `buffalo_sc` 的 recognition back
   - https://arxiv.org/abs/2107.13046
 - EdgeFace paper:
   - https://arxiv.org/abs/2307.01838
+- FaceNet + RetinaFace PyTorch integration reference:
+  - https://github.com/bubbliiiing/facenet-retinaface-pytorch
 - RKNN 風險與本專案部署邊界：
   - [docs/platform/rknn_operator_compatibility_risk.md](../platform/rknn_operator_compatibility_risk.md)
-

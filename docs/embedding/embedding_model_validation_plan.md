@@ -43,6 +43,15 @@
 - 第一批偏向更保守、較接近 `RKNN` 友善的 compact CNN 路線
 - 第二批可研究，但不先卡主線
 
+另外保留一條 deployment-first fallback：
+
+- `Luckfox RetinaFace + MobileFaceNet`
+
+這條不是一般 paper 候選，而是：
+
+- 若現有主線模型在 `RKNN` 轉換有問題
+- 優先檢查的 Luckfox / RKNN 已示範組合
+
 ---
 
 ## 4. 驗證順序
@@ -211,6 +220,10 @@
 2. 補完整 host reference / replay baseline
 3. 做第一輪 `ONNX -> RKNN` compatibility
 
+若這一步出現明顯 conversion / operator 阻塞，優先插入：
+
+4. `Luckfox RetinaFace + MobileFaceNet` compatibility check
+
 ### Phase B
 
 1. `PocketNet`
@@ -232,6 +245,11 @@
 
 - `EdgeFace`
 - `GhostFaceNets`
+
+但若阻塞主因是 `RKNN compatibility`，不是純 accuracy / latency 問題，
+則應優先於 `Phase C` 之前先檢查：
+
+- `Luckfox RetinaFace + MobileFaceNet`
 
 ---
 
@@ -258,10 +276,11 @@
 
 - 先把 `w600k_mbf` 當 baseline 做完整 `RKNN` 驗證
 - 不要只押單一模型
+- 若現有主線候選在 `RKNN` 轉換有問題，優先嘗試 Luckfox 已提供的
+  `RetinaFace + MobileFaceNet` 組合
 - 把 `PocketNet` 和 `MixFaceNet` 當正式 backup candidates
 - 等第一輪 conversion / board 結果出來，再決定是否需要更激進地研究 `EdgeFace` 或 `GhostFaceNets`
 
 一句話總結：
 
 - 下一步不是直接換模型，而是把 embedding 候選納入固定驗證矩陣，讓模型凍結建立在 `RV1106 + RKNN` 的實測證據上。
-

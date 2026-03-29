@@ -14,6 +14,7 @@ Top-level entry:
 - [Hardware Baseline](platform/rv1106_system_hardware_baseline.md)
 - [Numeric Type Policy](platform/rv1106_numeric_type_policy.md)
 - [Geometry Numeric Boundary](platform/geometry_numeric_boundary.md)
+- [RKNN Conversion And Generalization Guide](platform/rknn_conversion_and_generalization_guide.md)
 - [RKNN Embedding Validation Checklist](platform/rknn_embedding_validation_checklist.md)
 
 ## Detector

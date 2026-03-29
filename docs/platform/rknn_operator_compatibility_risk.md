@@ -81,6 +81,7 @@
 因此後續所有模型策略都應加入這條原則：
 
 - **先驗證 RKNN compatibility，再凍結模型**
+- **用通用 calibration set 驗證跨場域泛化，不接受 per-site recalibration 作為第一版主線前提**
 
 而不是反過來。
 
@@ -153,6 +154,15 @@
 - operator 更單純
 - 已知有 Rockchip 範例或接近案例
 - model zoo 中已有成功部署路徑的模型家族
+
+若現有主線模型在 `RKNN` 轉換上卡住，應優先檢查：
+
+- Luckfox 官方 `luckfox_pico_rknn_example` 已提供的模型組合
+  - 例如 `RetinaFace.rknn + mobilefacenet.rknn`
+
+原因不是它自動代表最佳精度，而是它屬於：
+
+- 已知較接近實際 Luckfox / RKNN 落地路徑的 `deployment-safe candidate`
 
 ### 8.2 改 ONNX graph
 
