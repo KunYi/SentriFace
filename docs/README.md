@@ -40,6 +40,8 @@ Top-level entry:
 - [Enrollment Module Interface](enrollment/enrollment_module_interface_spec.md)
 - [Enrollment Artifact Runner Guide](enrollment/enrollment_artifact_runner_guide.md)
 - [Baseline Prototype Package Binary Spec](enrollment/baseline_prototype_package_binary_spec.md)
+- [Feature-Only Cloud Adaptation Spec](enrollment/feature_only_cloud_adaptation_spec.md)
+- [Biometric Cloud Consent And Retention Spec](enrollment/biometric_cloud_consent_and_retention_spec.md)
 - [SQLite Persistence Evaluation](enrollment/sqlite_persistence_evaluation.md)
 - [Baseline Embedding Import Workflow](enrollment/baseline_embedding_import_workflow.md)
 - [Enrollment Baseline Import Runner Guide](enrollment/enrollment_baseline_import_runner_guide.md)

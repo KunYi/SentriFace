@@ -38,6 +38,20 @@
 - `EnrollmentStoreV2::BuildSearchIndexPackage(...)` 也應直接由 store 內部 zone
   state 建 package，而不是先經過 `ExportWeightedPrototypes()` bridge，避免主線
   package export 仍依賴舊的中介資料流。
+- 若未來要做雲端資料飛輪，應優先考慮：
+  - `feature-only`
+  - `tenant-scoped pseudonymization`
+  - 本地保留 identity mapping
+  - 雲端不持有原始人像與可直接回辨識自然人的資料
+- 這條路可作為中長期 SaaS 方向，但不應在第一版主線就做：
+  - image-based automatic retraining
+  - automatic backbone fine-tuning
+- 若未來啟用這種 feature telemetry 上雲能力，必須同時設計：
+  - 明示告知
+  - 合法同意
+  - 訓練/分析完成後刪除
+  - 不得挪用
+  - tenant 隔離與審計
 
 ---
 
