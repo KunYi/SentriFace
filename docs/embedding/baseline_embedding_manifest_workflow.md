@@ -13,7 +13,7 @@
 ## 流程
 
 1. 使用 `enrollment_artifact_runner` 從 `enrollment_summary.txt` 產生：
-   - `baseline_package_summary_*.txt`
+   - `baseline_artifact_summary*.txt`
    - `*_embedding_input_manifest.txt`
 2. 使用 `tools/run_baseline_embedding_onnx.py` 讀取 embedding input manifest
 3. 以 `w600k_mbf.onnx` 對每個 baseline image 產生真實 embedding CSV

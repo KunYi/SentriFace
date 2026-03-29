@@ -156,3 +156,7 @@
 - fail-safe 策略
 
 全部綁進 sample runner。
+
+若 unlock 流程後續要接入真實 `liveness / anti-spoof` gating，請另外參考：
+
+- [docs/access/rgb_liveness_anti_spoof_spec.md](rgb_liveness_anti_spoof_spec.md)

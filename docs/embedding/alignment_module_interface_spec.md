@@ -45,6 +45,15 @@ class FaceAligner {
 };
 ```
 
+目前這個模組也已補上 CPU warp 邊界：
+
+```cpp
+camera::Frame Warp(const camera::Frame& image,
+                   const AlignmentResult& alignment) const;
+camera::Frame Align(const camera::Frame& image,
+                    const sentriface::tracker::Landmark5& landmarks) const;
+```
+
 ### 3.1 預設模板
 
 第一版使用常見的 `112 x 112` 五點模板。
@@ -60,13 +69,17 @@ class FaceAligner {
 
 ---
 
-## 4. 為什麼先只做幾何層
+## 4. 幾何與 CPU Warp 分工
+
+`Estimate(...)` 仍是穩定的幾何主邊界。
+`Warp(...)` / `Align(...)` 則提供 CPU-first bring-up 所需的實際對齊影像輸出。
 
 這樣做的好處：
 
 - 容易測試
 - 不被 OpenCV / RGA / ISP API 綁死
 - 後續可把 transform 餵給不同影像後端
+- 目前就能先把 `landmarks -> aligned 112x112 crop` 主線跑通
 
 這很適合目前的 `SDD + TDD` 開發節奏。
 
@@ -96,3 +109,10 @@ alignment 雖然先做幾何層，但實際設計仍應考慮：
 - 不應設計成高解析、多分支、重複對齊流程
 
 因此第一版固定 `112 x 112` 是有意識的板端導向選擇。
+目前 CPU warp 採 bilinear sampling，後續若遷移到：
+
+- OpenCV warpAffine
+- RGA
+- ISP / NPU 前處理
+
+都應維持相同輸出語意，而不是重新定義 alignment 介面。

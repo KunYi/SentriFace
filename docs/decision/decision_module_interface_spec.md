@@ -143,3 +143,9 @@ decision 雖然先在 CPU 上驗證，但設計目標仍是：
 
 因此後續若要把成功驗證事件寫回 `recent adaptive / verified history`，
 應透過 pipeline workflow 完成，而不是由 decision engine 直接操作資料庫。
+
+若後續接入真實 `liveness / anti-spoof`，其 threat model 與 feature 邊界應以：
+
+- [docs/access/rgb_liveness_anti_spoof_spec.md](../access/rgb_liveness_anti_spoof_spec.md)
+
+為準；`decision` 層只消費 `liveness_ok` 與其 gating 結果。

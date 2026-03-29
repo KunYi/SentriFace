@@ -35,7 +35,13 @@
 
 ## Core Rules
 
-- 先有 spec，再有實作
+- 開發流程預設採 `SDD + TDD`：
+  - `Spec-Driven Development`
+  - `Test-Driven Development`
+- 若新增或調整正式邊界：
+  - 先補或先更新 spec
+  - 再補對應測試
+  - 最後再落實作
 - 能補測試就先補測試
 - 若設計明顯偏離既有基線，先更新文件
 - `CPU-first` 驗證可以，但設計邊界仍必須服從 `RV1106 + RKNN`
@@ -130,6 +136,7 @@
 
 ### Access / logging / diagnostics
 - [docs/access/access_control_backend_spec.md](docs/access/access_control_backend_spec.md)
+- [docs/access/rgb_liveness_anti_spoof_spec.md](docs/access/rgb_liveness_anti_spoof_spec.md)
 - [docs/logging/logging_system_spec.md](docs/logging/logging_system_spec.md)
 - [docs/logging/binary_logging_pipeline_spec.md](docs/logging/binary_logging_pipeline_spec.md)
 - [docs/logging/valgrind_workflow.md](docs/logging/valgrind_workflow.md)
@@ -158,7 +165,7 @@
 - `GenerateMockBaselinePrototypePackage(...)` 可打通 artifact -> baseline package -> store
 - `enrollment_artifact_runner` 可直接驗證上述資料流
 - `baseline_embedding_input_manifest` 已可作為 host artifact 接真實 embedding workflow 的橋接產物
-- `LoadBaselinePrototypePackageFromEmbeddingCsv(...)` 已可作為真實 baseline embedding CSV 的正式導入邊界
+- `LoadBaselinePrototypePackage(...)` 與 `.sfbp -> .sfsi` 已是正式主線；`LoadBaselinePrototypePackageFromEmbeddingCsv(...)` 只保留作真實 baseline embedding CSV 的互通導入邊界
 
 注意：
 - `GenerateMockBaselinePrototypePackage(...)` 只是 bring-up 骨架，不是最終真實 embedding runtime

@@ -43,6 +43,9 @@ ctest --test-dir build_ort --output-on-failure
 
 - **現在已經能載入 ONNX Runtime C/C++ package，並執行 C++ smoke path**
 
+另外目前 `embedding` 模組也已補上 C++ `onnxruntime` backend 邊界，可由
+`FaceEmbedder` 直接載入 embedding model 做 inference。
+
 ---
 
 ## 2. 已可實跑的路徑

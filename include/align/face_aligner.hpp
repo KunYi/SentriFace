@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 
+#include "camera/frame_source.hpp"
 #include "tracker/types.hpp"
 
 namespace sentriface::align {
@@ -36,6 +37,14 @@ class FaceAligner {
   explicit FaceAligner(const AlignmentConfig& config = AlignmentConfig {});
 
   AlignmentResult Estimate(
+      const sentriface::tracker::Landmark5& landmarks) const;
+
+  sentriface::camera::Frame Warp(
+      const sentriface::camera::Frame& image,
+      const AlignmentResult& alignment) const;
+
+  sentriface::camera::Frame Align(
+      const sentriface::camera::Frame& image,
       const sentriface::tracker::Landmark5& landmarks) const;
 
  private:

@@ -28,6 +28,8 @@ src/embedding/face_embedder.cpp
 主要類型：
 
 - `EmbeddingConfig`
+- `EmbeddingRuntimeConfig`
+- `EmbeddingInputTensor`
 - `EmbeddingResult`
 - `FaceEmbedder`
 
@@ -35,11 +37,12 @@ src/embedding/face_embedder.cpp
 
 ## 3. 第一版設計
 
-`FaceEmbedder` 先提供三個穩定能力：
+`FaceEmbedder` 目前提供四個穩定能力：
 
 1. 驗證輸入尺寸是否符合模型要求
-2. 將 raw output 轉成 embedding 向量
-3. 計算 cosine similarity
+2. 把 image/frame preprocess 成 model input tensor
+3. 將 raw output 轉成 embedding 向量
+4. 計算 cosine similarity
 
 ```cpp
 class FaceEmbedder {
@@ -47,7 +50,12 @@ class FaceEmbedder {
   explicit FaceEmbedder(const EmbeddingConfig& config = EmbeddingConfig {});
 
   bool ValidateInputShape(int width, int height, int channels) const;
+  EmbeddingInputTensor PrepareInputTensor(
+      const sentriface::camera::Frame& image) const;
   EmbeddingResult Postprocess(const std::vector<float>& raw_output) const;
+  bool InitializeRuntime(
+      const EmbeddingRuntimeConfig& runtime_config = EmbeddingRuntimeConfig {});
+  EmbeddingResult Run(const sentriface::camera::Frame& image) const;
   float CosineSimilarity(const std::vector<float>& a,
                          const std::vector<float>& b) const;
 };
@@ -62,6 +70,21 @@ class FaceEmbedder {
 - `l2_normalize = true`
 
 ---
+
+### 3.2 Runtime 邊界
+
+目前 runtime backend 分成：
+
+- `stub_deterministic`
+- `onnxruntime`
+
+其中：
+
+- `PrepareInputTensor(...)`
+- `Postprocess(...)`
+
+是穩定的 backend-agnostic core；
+runtime 只負責真正的 model inference。
 
 ## 4. 為什麼先做 backend-agnostic core
 
@@ -88,6 +111,7 @@ class FaceEmbedder {
 
 等 CPU 端資料流與測試穩定後，再接：
 
+- C++ `onnxruntime`
 - RKNN runtime
 - NPU backend
 - 或其他 vendor-specific inference path
