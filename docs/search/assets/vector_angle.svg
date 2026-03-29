@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="320" viewBox="0 0 520 320">
+  <rect width="520" height="320" fill="#fffdf8"/>
+  <line x1="90" y1="250" x2="420" y2="250" stroke="#374151" stroke-width="3"/>
+  <line x1="90" y1="250" x2="90" y2="40" stroke="#374151" stroke-width="3"/>
+  <line x1="90" y1="250" x2="340" y2="220" stroke="#2563eb" stroke-width="5"/>
+  <polygon points="340,220 325,212 328,227" fill="#2563eb"/>
+  <line x1="90" y1="250" x2="255" y2="95" stroke="#c2410c" stroke-width="5"/>
+  <polygon points="255,95 241,101 251,112" fill="#c2410c"/>
+  <path d="M140 247 A50 50 0 0 1 127 213" fill="none" stroke="#16a34a" stroke-width="3"/>
+  <text x="142" y="210" font-size="18" font-family="Arial, sans-serif" fill="#16a34a">θ</text>
+  <text x="350" y="225" font-size="18" font-family="Arial, sans-serif" fill="#2563eb">u</text>
+  <text x="260" y="92" font-size="18" font-family="Arial, sans-serif" fill="#c2410c">v</text>
+  <text x="425" y="255" font-size="16" font-family="Arial, sans-serif" fill="#111827">x</text>
+  <text x="80" y="36" font-size="16" font-family="Arial, sans-serif" fill="#111827">y</text>
+  <circle cx="90" cy="250" r="5" fill="#111827"/>
+  <text x="100" y="272" font-size="16" font-family="Arial, sans-serif" fill="#111827">(0,0)</text>
+  <text x="42" y="30" font-size="22" font-family="Arial, sans-serif" fill="#111827">Vectors and angle</text>
+</svg>

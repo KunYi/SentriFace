@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="220" viewBox="0 0 760 220">
+  <rect width="760" height="220" fill="#fffdf8"/>
+  <rect x="40" y="70" width="180" height="70" rx="12" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
+  <rect x="290" y="70" width="180" height="70" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="2"/>
+  <rect x="540" y="70" width="180" height="70" rx="12" fill="#fee2e2" stroke="#dc2626" stroke-width="2"/>
+  <text x="112" y="98" font-size="24" font-family="Arial, sans-serif" fill="#111827">Search</text>
+  <text x="74" y="124" font-size="16" font-family="Arial, sans-serif" fill="#111827">candidate ranking</text>
+  <text x="341" y="98" font-size="24" font-family="Arial, sans-serif" fill="#111827">Decision</text>
+  <text x="308" y="124" font-size="16" font-family="Arial, sans-serif" fill="#111827">threshold / margin / stability</text>
+  <text x="605" y="98" font-size="24" font-family="Arial, sans-serif" fill="#111827">Access</text>
+  <text x="590" y="124" font-size="16" font-family="Arial, sans-serif" fill="#111827">unlock or reject</text>
+  <line x1="220" y1="105" x2="290" y2="105" stroke="#374151" stroke-width="3"/>
+  <polygon points="290,105 276,98 276,112" fill="#374151"/>
+  <line x1="470" y1="105" x2="540" y2="105" stroke="#374151" stroke-width="3"/>
+  <polygon points="540,105 526,98 526,112" fill="#374151"/>
+  <text x="44" y="34" font-size="24" font-family="Arial, sans-serif" fill="#111827">Search, decision, and access are different layers</text>
+</svg>

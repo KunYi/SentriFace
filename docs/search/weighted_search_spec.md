@@ -14,6 +14,17 @@
 
 ## 2. 為什麼需要 weighted search
 
+若想先建立本文件用到的 search 與 decision 直覺，例如：
+
+- normalized similarity score 的幾何意義
+- 為什麼 score 與 margin 要分開看
+- 為什麼 top-1 不等於足以 unlock
+- 為什麼 false accept / false reject 是 operating point tradeoff
+
+可先參考：
+
+- `docs/search/embedding_search_intuition.md`
+
 如果 search 仍把所有 prototype 當作同權重，會出現幾個風險：
 
 - recent adaptive zone 的短期樣本可能過度影響 top-1

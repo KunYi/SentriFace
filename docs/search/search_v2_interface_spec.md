@@ -19,6 +19,17 @@ V2 的重點是把目前 search 從：
 
 ## 2. 設計目標
 
+若想先理解本文件背後的概念脈絡，例如：
+
+- normalized embedding search 的幾何直覺
+- cosine similarity 與 Euclidean distance 的關係
+- `top-1 / top-2 margin`、open-set rejection、false accept / false reject 的意義
+- 為什麼 search ranking 與最終 authorization 不應混為一談
+
+可先參考：
+
+- `docs/search/embedding_search_intuition.md`
+
 Search V2 應滿足：
 
 - 與 `.sfsi` / `FaceSearchV2IndexPackage` 相容

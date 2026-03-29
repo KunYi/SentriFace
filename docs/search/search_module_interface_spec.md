@@ -17,6 +17,16 @@
 
 ## 2. 介面定位
 
+若想先建立本文件使用的幾何與 decision 直覺，例如：
+
+- 為什麼 normalized dot product / cosine similarity 可作為 search score
+- 為什麼 `top-1` / `top-2 margin` 不能直接等同最終 access decision
+- 為什麼 replay 對 threshold 調整比直覺更重要
+
+可先參考：
+
+- `docs/search/embedding_search_intuition.md`
+
 目前模組位置：
 
 ```text

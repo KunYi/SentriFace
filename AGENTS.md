@@ -108,6 +108,7 @@
 - [docs/embedding/embedding_module_interface_spec.md](docs/embedding/embedding_module_interface_spec.md)
 - [docs/embedding/embedding_assisted_relink_design.md](docs/embedding/embedding_assisted_relink_design.md)
 - [docs/embedding/baseline_embedding_manifest_workflow.md](docs/embedding/baseline_embedding_manifest_workflow.md)
+- [docs/search/embedding_search_intuition.md](docs/search/embedding_search_intuition.md)
 - [docs/search/search_module_interface_spec.md](docs/search/search_module_interface_spec.md)
 - [docs/search/search_v2_interface_spec.md](docs/search/search_v2_interface_spec.md)
 - [docs/search/weighted_search_spec.md](docs/search/weighted_search_spec.md)
